@@ -60,7 +60,8 @@ class Parameters:
     def sudo(self):
         return self
 
-    def get_param(self, name, default=False):
+    # Odoo 20's typed readers; it has no get_param, so a call to it fails here as it does there.
+    def get_str(self, name, default=""):
         return self.values.get(name, default)
 
 

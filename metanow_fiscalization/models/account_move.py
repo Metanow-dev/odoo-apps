@@ -92,7 +92,8 @@ class AccountMove(models.Model):
 
     def _metanow_fiscal_key(self, attempt):
         self.ensure_one()
-        database = self.env["ir.config_parameter"].sudo().get_param("database.uuid") or "db"
+        # Odoo 20 reads parameters by type; get_param is gone (pipeline #5322, job 40950).
+        database = self.env["ir.config_parameter"].sudo().get_str("database.uuid") or "db"
         return f"odoo-{database}-{self.id}-{attempt}"
 
     def _metanow_fiscal_trigger(self, xml_id):
