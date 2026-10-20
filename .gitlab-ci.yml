@@ -10,6 +10,11 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"
 
+default:
+  # The shared runner takes tagged jobs only.
+  tags: [docker]
+  interruptible: true
+
 stages:
   - test
   - package
