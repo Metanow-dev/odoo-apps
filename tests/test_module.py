@@ -3,6 +3,7 @@
 import ast
 import hashlib
 import importlib.util
+import json
 import re
 import subprocess
 import sys
@@ -142,12 +143,16 @@ class ManifestTests(unittest.TestCase):
             compile(path.read_text(encoding="utf-8"), str(path), "exec")
 
 
+def _package_tool():
+    spec = importlib.util.spec_from_file_location("odoo_package", support.ODOO_DIR / "tools" / "package.py")
+    package = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(package)
+    return package
+
+
 class PackageTests(unittest.TestCase):
-    def build(self, out):
-        spec = importlib.util.spec_from_file_location("odoo_package", support.ODOO_DIR / "tools" / "package.py")
-        package = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(package)
-        return package.build(out)
+    def build(self, out, **options):
+        return _package_tool().build(out, **options)
 
     def test_the_zip_is_reproducible_and_checksummed(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
@@ -167,6 +172,43 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(all(name.startswith("metanow_fiscalization/") for name in names))
         self.assertFalse([name for name in names if "__pycache__" in name or "/tests/" in name])
         self.assertFalse([name for name in names if Path(name).suffix in (".pem", ".key", ".p12", ".pfx")])
+
+    def test_no_manifest_is_written_unless_asked(self):
+        with tempfile.TemporaryDirectory() as out:
+            self.build(out)
+            self.assertFalse(Path(out, "manifest.json").exists())
+
+    def test_the_manifest_states_the_zip_it_sits_beside(self):
+        # The web app's Plugins page shows these facts as they are; a wrong size or checksum
+        # here is a wrong statement to the customer about the file they install.
+        with tempfile.TemporaryDirectory() as out:
+            path, digest = self.build(out, manifest=True)
+            facts = json.loads(Path(out, "manifest.json").read_text(encoding="utf-8"))
+            size = len(path.read_bytes())
+        self.assertEqual(set(facts), {"module", "fileName", "version", "size", "sha256"})
+        self.assertEqual(facts["module"], "metanow_fiscalization")
+        self.assertEqual(facts["fileName"], path.name)
+        self.assertEqual(facts["version"], manifest()["version"])
+        self.assertEqual(facts["fileName"], f"metanow_fiscalization-{manifest()['version']}.zip")
+        self.assertEqual(facts["size"], size)
+        self.assertEqual(facts["sha256"], digest)
+        self.assertRegex(facts["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_the_manifest_is_reproducible(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            self.build(first, manifest=True)
+            self.build(second, manifest=True)
+            self.assertEqual(Path(first, "manifest.json").read_bytes(), Path(second, "manifest.json").read_bytes())
+
+    def test_the_command_line_writes_the_manifest(self):
+        with tempfile.TemporaryDirectory() as out:
+            result = subprocess.run(
+                [sys.executable, str(support.ODOO_DIR / "tools" / "package.py"), "--out", out, "--manifest"],
+                capture_output=True, text=True, check=True)
+            zip_path, digest = result.stdout.split()
+            facts = json.loads(Path(out, "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(facts["fileName"], Path(zip_path).name)
+        self.assertEqual(facts["sha256"], digest)
 
 
 if __name__ == "__main__":
