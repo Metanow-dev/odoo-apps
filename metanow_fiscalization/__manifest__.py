@@ -1,16 +1,16 @@
 {
-    "name": "Fiskalizimi me efis / Fiscalisation with efis",
-    "summary": "Faturat e klientëve fiskalizohen nga efis. / Customer invoices fiscalised by efis.",
+    "name": "Fiscalisation with efis",
+    "summary": "Albanian e-invoice fiscalisation of customer invoices through the efis service.",
     "description": """
-Fiskalizimi i faturave të klientëve nëpërmjet efis.
-Customer-invoice fiscalisation through efis.
+Customer-invoice fiscalisation through efis, an external service (https://efis.metanow.com).
 
 The module sends each posted customer invoice to efis and stores what efis returns: the fiscal
 number, the issuer security code, the registration code and the verification URL. It does not
 sign, number or compute a security code, it holds no certificate or key, and it never talks to
-the tax authority. It pairs with efis using a single-use code from the efis web app.
+the tax authority. It needs an efis account and pairs with efis using a single-use code from the
+efis web app. Nothing is sent until an administrator turns fiscalisation on and pairs the company.
 """,
-    "version": "20.0.1.0.0",
+    "version": "20.0.1.0.1",
     "category": "Accounting/Localizations",
     "author": "Metanow",
     "website": "https://efis.metanow.com",

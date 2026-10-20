@@ -156,6 +156,20 @@ class AppsStoreTests(unittest.TestCase):
         page = MODULE / "static" / "description" / "index.html"
         ElementTree.fromstring("<root>" + page.read_text(encoding="utf-8") + "</root>")
 
+    def test_the_store_name_fits(self):
+        # Vendor guidelines: explicit, 25 characters or fewer, no company name.
+        name = manifest()["name"]
+        self.assertLessEqual(len(name), 25)
+        self.assertNotIn("Metanow", name)
+
+    def test_the_description_page_is_english_with_no_external_link_or_script(self):
+        # Vendor guidelines: English, no JavaScript, links only into static/description,
+        # YouTube, Teams, mailto: and skype:. Any other external link is invalidated.
+        page = (MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("<script", page.lower())
+        self.assertNotRegex(page, r"(?i)(href|src)\s*=\s*[\"']https?://")
+        self.assertNotRegex(page, r"[ëç]", "the store page must be in English")
+
     def test_the_module_is_free_and_licensed(self):
         self.assertNotIn("price", manifest())
         self.assertNotIn("currency", manifest())

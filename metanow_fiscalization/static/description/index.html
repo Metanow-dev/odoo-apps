@@ -1,45 +1,64 @@
-<section class="oe_container">
-    <div class="oe_row oe_spaced">
-        <h2 class="oe_slogan">Fiskalizimi me efis / Fiscalisation with efis</h2>
-        <h3 class="oe_slogan">Faturat e klientëve fiskalizohen nga efis. / Customer invoices fiscalised by efis.</h3>
-        <p>
-            The module sends each posted customer invoice to efis and stores on the invoice what efis
-            returns: the fiscal number, the issuer security code, the registration code and the
-            verification URL. It does not sign, number or compute a security code, it holds no
-            certificate or key, and it never talks to the tax authority. The certificate stays in efis.
-        </p>
-        <p>
-            Moduli dërgon te efis çdo faturë klienti të postuar dhe ruan në faturë atë që kthen efis:
-            numrin fiskal, kodin e sigurisë së lëshuesit, kodin e regjistrimit dhe adresën e verifikimit.
-        </p>
+<section class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h2 class="text-center">Fiscalisation with efis</h2>
+            <h4 class="text-center">Albanian fiscalisation of customer invoices, through the efis service</h4>
+            <p>
+                The module sends each posted customer invoice to efis and stores on the invoice what
+                efis returns: the fiscal number, the issuer security code, the registration code and
+                the verification URL. It does not sign, number or compute a security code, it holds no
+                certificate or key, and it never talks to the tax authority. The certificate stays in
+                efis.
+            </p>
+        </div>
     </div>
 </section>
 
-<section class="oe_container">
-    <div class="oe_row oe_spaced">
-        <h3>What it does</h3>
-        <ul>
-            <li>Checks the invoice as efis would before a number is spent. If efis would not accept it,
-                the posting is rolled back with the list of problems and nothing is sent.</li>
-            <li>Queues accepted invoices and sends them right after posting. Two scheduled actions send
-                the queue and read the states.</li>
-            <li>Adds a "Fiskalizimi / Fiscalisation" tab to the invoice with the fiscal state, the fiscal
-                number, the security code, the registration code and the verification URL.</li>
-            <li>Prints the fiscal number, the NIVF, the NSLF and the QR code of the verification URL on
-                the invoice PDF.</li>
-            <li>Never lets an invoice sent for fiscalisation go back to draft, be cancelled or be deleted.
-                It is corrected only by a corrective document.</li>
-        </ul>
+<section class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h3>Requires an efis account</h3>
+            <p>
+                efis is an external service run by Metanow. This module is its Odoo client and does
+                nothing on its own: you need an efis account for your business, and the module pairs
+                with it using a single-use code issued in the efis web app.
+            </p>
+            <h3>What is sent, and when</h3>
+            <p>
+                Nothing leaves Odoo until an administrator turns fiscalisation on in Settings and
+                pairs the company with efis. From then on, each posted customer invoice is sent to efis:
+                the seller's tax number, address and registration codes, the buyer's name, identifier,
+                address, town and country, and the invoice's lines, taxes, totals and payment method. efis fiscalises it with the Albanian tax
+                authority and returns the result.
+            </p>
+        </div>
     </div>
 </section>
 
-<section class="oe_container">
-    <div class="oe_row oe_spaced">
-        <h3>Requirements</h3>
-        <ul>
-            <li>An efis account. The module pairs with efis using a single-use code from the efis web app.</li>
-            <li>Odoo 20 with Invoicing, on Odoo.sh or self-hosted. Odoo Online cannot load Python modules.</li>
-        </ul>
-        <p>Setup guide and support: <a href="https://efis.metanow.com">efis.metanow.com</a></p>
+<section class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h3>Features</h3>
+            <ul>
+                <li>Checks the invoice as efis would before a number is spent. If efis would not accept
+                    it, the posting is rolled back with the list of problems and nothing is sent.</li>
+                <li>Queues accepted invoices and sends them right after posting. Two scheduled actions
+                    send the queue and read the states every 5 minutes.</li>
+                <li>Adds a Fiscalisation tab to the invoice with the fiscal state, the fiscal number,
+                    the issuer security code, the registration code and the verification URL.</li>
+                <li>Prints the fiscal number, the NIVF, the NSLF and the QR code of the verification URL
+                    on the invoice PDF.</li>
+                <li>Filters for invoices waiting for efis and invoices that need action.</li>
+                <li>Never lets an invoice sent for fiscalisation go back to draft, be cancelled or be
+                    deleted. It is corrected only by a corrective document.</li>
+            </ul>
+            <h3>Limits</h3>
+            <ul>
+                <li>Odoo 20, Community or Enterprise, on Odoo.sh or self-hosted. Odoo Online cannot load
+                    this module.</li>
+                <li>Credit notes and receipts are refused while fiscalisation is on; corrections are
+                    issued from efis.</li>
+            </ul>
+        </div>
     </div>
 </section>
