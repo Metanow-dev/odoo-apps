@@ -1,0 +1,49 @@
+# DEV-1731: a disposable Odoo 20 beside the efis stack, for the odoo-install CI job only.
+# Used as an override of the root compose.yml (docker compose -f compose.yml -f odoo/ci/compose.odoo.yml).
+# Paths are relative to the repository root, the project directory.
+#
+# Everything here is thrown away when the job ends. The worker sends to the mock authority and
+# nowhere else (odoo/ci/odoo-install.sh refuses any other endpoint). Odoo talks to efis's api
+# only; it holds no certificate and no key.
+
+services:
+  odoo-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_DB: postgres
+      # A job-scoped database holding one test invoice, destroyed with the job: the same
+      # reasoning as the store stage in .gitlab-ci.yml. Never used by a deployed service.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: ["postgres", "-c", "fsync=off"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  odoo:
+    build:
+      context: .
+      dockerfile: odoo/ci/Dockerfile.odoo
+      args:
+        ODOO_IMAGE: "${EFIS_ODOO_IMAGE:-odoo:20.0}"
+    environment:
+      HOST: odoo-db
+      USER: odoo
+      PASSWORD: odoo
+    depends_on:
+      odoo-db:
+        condition: service_healthy
+    profiles: ["odoo"]
+
+  driver:
+    build:
+      context: .
+      dockerfile: odoo/ci/Dockerfile.driver
+    environment:
+      EFIS_BASE_URL: http://api:8080
+      EFIS_PROVISIONING_KEY: "${EFIS_PROVISIONING_KEY:?EFIS_PROVISIONING_KEY is required}"
+      EFIS_ADMIN_EMAIL: "${EFIS_ADMIN_EMAIL:?EFIS_ADMIN_EMAIL is required}"
+      EFIS_ADMIN_PASSWORD: "${EFIS_ADMIN_PASSWORD:?EFIS_ADMIN_PASSWORD is required}"
+    profiles: ["odoo"]

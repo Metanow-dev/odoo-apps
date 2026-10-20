@@ -1,0 +1,6 @@
+# DEV-1731: the Odoo image the odoo-install job installs the module into. The module is copied
+# from the packaged zip's unpacked tree (dist/odoo/addons), so CI installs exactly what it ships.
+ARG ODOO_IMAGE=odoo:20.0
+FROM ${ODOO_IMAGE}
+COPY dist/odoo/addons/metanow_fiscalization /mnt/extra-addons/metanow_fiscalization
+COPY odoo/ci/post_invoice.py /ci/post_invoice.py

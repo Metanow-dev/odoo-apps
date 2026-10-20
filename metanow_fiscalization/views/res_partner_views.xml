@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="view_partner_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">res.partner.form.metanow_fiscal</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="metanow_fiscal_identifier_type"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

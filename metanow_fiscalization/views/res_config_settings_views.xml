@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="res_config_settings_view_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.metanow_fiscal</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='account']" position="inside">
+                <block title="Fiskalizimi me efis / Fiscalisation with efis" name="metanow_fiscal_block">
+                    <setting string="Fiskalizimi / Fiscalisation"
+                             help="Faturat e klientëve fiskalizohen nga efis kur postohen. / Customer invoices are fiscalised by efis when they are posted.">
+                        <field name="metanow_fiscal_enabled"/>
+                    </setting>
+                    <setting string="Lidhja me efis / Connection to efis" groups="base.group_system">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_api_url" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_api_url"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_tenant" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_tenant"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_channel" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_channel"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_pairing_code" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_pairing_code"/>
+                            </div>
+                            <div class="mt8">
+                                <button name="action_metanow_fiscal_pair" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        string="Çifto me efis / Pair with efis"/>
+                                <button name="action_metanow_fiscal_refresh_profile" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        string="Kontrollo konfigurimin / Check the configuration"/>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting string="Kodet e regjistrimit / Registration codes">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_vat_status" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_vat_status"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_business_unit_code" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_business_unit_code"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_operator_code" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_operator_code"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_software_code" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_software_code"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_device_code" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_device_code"/>
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

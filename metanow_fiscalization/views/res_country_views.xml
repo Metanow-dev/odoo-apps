@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="view_country_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">res.country.form.metanow_fiscal</field>
+        <field name="model">res.country</field>
+        <field name="inherit_id" ref="base.view_country_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='code']" position="after">
+                <field name="metanow_fiscal_country_code"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

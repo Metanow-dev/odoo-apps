@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="view_move_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">account.move.form.metanow_fiscal</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_metanow_fiscal_retry" type="object"
+                        string="Dërgo përsëri te efis / Send to efis again"
+                        invisible="metanow_fiscal_state != 'parked'"
+                        groups="account.group_account_invoice"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="metanow_fiscal" string="Fiskalizimi / Fiscalisation"
+                      invisible="not metanow_fiscal_state">
+                    <group>
+                        <group>
+                            <field name="metanow_fiscal_state"/>
+                            <field name="metanow_fiscal_efis_state"/>
+                            <field name="metanow_fiscal_number"/>
+                            <field name="metanow_fiscal_issued_at"/>
+                        </group>
+                        <group>
+                            <field name="metanow_fiscal_security_code"/>
+                            <field name="metanow_fiscal_registration_code"/>
+                            <field name="metanow_fiscal_verification_url" widget="url"/>
+                            <field name="metanow_fiscal_document_id"/>
+                        </group>
+                    </group>
+                    <field name="metanow_fiscal_error" invisible="not metanow_fiscal_error"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_invoice_filter_metanow_fiscal" model="ir.ui.view">
+        <field name="name">account.move.search.metanow_fiscal</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter name="metanow_fiscal_attention"
+                        string="Fiskalizimi kërkon veprim / Fiscalisation needs action"
+                        domain="[('metanow_fiscal_state', 'in', ('parked', 'refused', 'rejected'))]"/>
+                <filter name="metanow_fiscal_pending"
+                        string="Në pritje të efis / Waiting for efis"
+                        domain="[('metanow_fiscal_state', 'in', ('to_send', 'sent', 'deferred'))]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

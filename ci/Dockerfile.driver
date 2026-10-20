@@ -1,0 +1,7 @@
+# DEV-1731: sets up the efis side of the odoo-install job (a business, its owner, registry codes,
+# a generated test certificate, a pairing code). It plays the business owner in the efis web app;
+# the Odoo module never sees the certificate.
+FROM python:3.13-slim
+RUN pip install --no-cache-dir cryptography==44.0.2
+COPY odoo/ci/provision.py /ci/provision.py
+ENTRYPOINT ["python", "/ci/provision.py"]
