@@ -1,0 +1,45 @@
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Fiskalizimi me efis / Fiscalisation with efis</h2>
+        <h3 class="oe_slogan">Faturat e klientëve fiskalizohen nga efis. / Customer invoices fiscalised by efis.</h3>
+        <p>
+            The module sends each posted customer invoice to efis and stores on the invoice what efis
+            returns: the fiscal number, the issuer security code, the registration code and the
+            verification URL. It does not sign, number or compute a security code, it holds no
+            certificate or key, and it never talks to the tax authority. The certificate stays in efis.
+        </p>
+        <p>
+            Moduli dërgon te efis çdo faturë klienti të postuar dhe ruan në faturë atë që kthen efis:
+            numrin fiskal, kodin e sigurisë së lëshuesit, kodin e regjistrimit dhe adresën e verifikimit.
+        </p>
+    </div>
+</section>
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h3>What it does</h3>
+        <ul>
+            <li>Checks the invoice as efis would before a number is spent. If efis would not accept it,
+                the posting is rolled back with the list of problems and nothing is sent.</li>
+            <li>Queues accepted invoices and sends them right after posting. Two scheduled actions send
+                the queue and read the states.</li>
+            <li>Adds a "Fiskalizimi / Fiscalisation" tab to the invoice with the fiscal state, the fiscal
+                number, the security code, the registration code and the verification URL.</li>
+            <li>Prints the fiscal number, the NIVF, the NSLF and the QR code of the verification URL on
+                the invoice PDF.</li>
+            <li>Never lets an invoice sent for fiscalisation go back to draft, be cancelled or be deleted.
+                It is corrected only by a corrective document.</li>
+        </ul>
+    </div>
+</section>
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h3>Requirements</h3>
+        <ul>
+            <li>An efis account. The module pairs with efis using a single-use code from the efis web app.</li>
+            <li>Odoo 20 with Invoicing, on Odoo.sh or self-hosted. Odoo Online cannot load Python modules.</li>
+        </ul>
+        <p>Setup guide and support: <a href="https://efis.metanow.com">efis.metanow.com</a></p>
+    </div>
+</section>

@@ -143,6 +143,25 @@ class ManifestTests(unittest.TestCase):
             compile(path.read_text(encoding="utf-8"), str(path), "exec")
 
 
+class AppsStoreTests(unittest.TestCase):
+    """The Odoo Apps store lists the module from efis/odoo-apps (WORKFLOW.md). It reads the icon and
+    the description page from static/description, and a manifest with a price is a paid app."""
+
+    def test_the_store_icon_is_a_png(self):
+        icon = MODULE / "static" / "description" / "icon.png"
+        self.assertTrue(icon.is_file())
+        self.assertEqual(icon.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+
+    def test_the_store_description_page_parses(self):
+        page = MODULE / "static" / "description" / "index.html"
+        ElementTree.fromstring("<root>" + page.read_text(encoding="utf-8") + "</root>")
+
+    def test_the_module_is_free_and_licensed(self):
+        self.assertNotIn("price", manifest())
+        self.assertNotIn("currency", manifest())
+        self.assertTrue(manifest().get("license"))
+
+
 def _package_tool():
     spec = importlib.util.spec_from_file_location("odoo_package", support.ODOO_DIR / "tools" / "package.py")
     package = importlib.util.module_from_spec(spec)
