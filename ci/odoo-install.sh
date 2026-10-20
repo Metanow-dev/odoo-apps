@@ -29,8 +29,12 @@ EFIS_ADMIN_EMAIL="admin-$(random | cut -c1-8)@example.invalid"
 EFIS_ADMIN_PASSWORD="$(random)"
 export EFIS_POSTGRES_PASSWORD EFIS_PROVISIONING_KEY EFIS_ADMIN_EMAIL EFIS_ADMIN_PASSWORD
 
-compose() { docker compose -p efis-odoo-ci -f compose.yml -f odoo/ci/compose.odoo.yml "$@"; }
-trap 'compose --profile odoo logs --no-color api worker mock-cis > odoo-install-efis.log 2>&1 || true; compose --profile odoo down -v --remove-orphans > /dev/null 2>&1 || true' EXIT
+# One compose project per job. When the dind service does not come up, jobs fall back to the
+# runner's shared daemon, and a fixed project name let two concurrent jobs recreate and tear down
+# each other's containers (pipelines #5321 and #5322).
+PROJECT="efis-odoo-ci-${CI_JOB_ID:-local-$$}"
+compose() { docker compose -p "$PROJECT" -f compose.yml -f odoo/ci/compose.odoo.yml "$@"; }
+trap 'compose --profile odoo logs --no-color migrate api worker mock-cis > odoo-install-efis.log 2>&1 || true; compose --profile odoo down -v --remove-orphans > /dev/null 2>&1 || true' EXIT
 
 compose up -d api worker mock-cis
 healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q "$1")" 2>/dev/null)" = healthy ]; }
@@ -46,7 +50,9 @@ PAIRING="$(compose --profile odoo run --rm -T driver | tail -n 1)"
 field() { printf '%s' "$PAIRING" | sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p"; }
 
 compose --profile odoo up -d --wait odoo-db
-compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization --stop-after-init --no-http
+# The install output is kept as an artifact either way; set -e still fails the job on a bad install.
+compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization --stop-after-init --no-http > odoo-install.log 2>&1 \
+  || { tail -n 100 odoo-install.log >&2; exit 1; }
 
 compose --profile odoo run --rm -T \
   -e EFIS_BASE_URL=http://api:8080 \
@@ -55,6 +61,6 @@ compose --profile odoo run --rm -T \
   -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)" \
   -e EFIS_OPERATOR_CODE="$(field operatorCode)" \
   -e EFIS_SOFTWARE_CODE="$(field softwareCode)" \
-  odoo odoo shell -d ci < odoo/ci/post_invoice.py | tee odoo-install.log
+  odoo odoo shell -d ci < odoo/ci/post_invoice.py | tee -a odoo-install.log
 
 grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not fiscalised through efis." >&2; exit 1; }
