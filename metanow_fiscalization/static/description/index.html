@@ -1,64 +1,121 @@
-<section class="container">
+<section class="container" style="padding-top: 24px; padding-bottom: 24px;">
     <div class="row">
-        <div class="col-md-12">
-            <h2 class="text-center">Fiscalisation with efis</h2>
-            <h4 class="text-center">Albanian fiscalisation of customer invoices, through the efis service</h4>
-            <p>
-                The module sends each posted customer invoice to efis and stores on the invoice what
-                efis returns: the fiscal number, the issuer security code, the registration code and
-                the verification URL. It does not sign, number or compute a security code, it holds no
-                certificate or key, and it never talks to the tax authority. The certificate stays in
-                efis.
+        <div class="col-md-12 text-center">
+            <h2 style="color: #c4454d; font-weight: 700;">AL - Fiskalizimi me efis</h2>
+            <h4 style="color: #141414;">Albanian fiscalisation for Odoo 20 customer invoices</h4>
+            <p class="lead" style="margin-top: 16px;">
+                Every customer invoice you post in Odoo is fiscalised with the Albanian tax authority
+                through efis, and comes back with its fiscal number, its NIVF and NSLF codes and the QR
+                code your customer can verify. Your accountants keep working in Odoo as before.
             </p>
+        </div>
+    </div>
+    <div class="row" style="margin-top: 16px;">
+        <div class="col-md-12">
+            <img src="cover.png" class="img img-fluid" alt="AL - Fiskalizimi me efis"/>
         </div>
     </div>
 </section>
 
-<section class="container">
+<section class="container" style="padding-top: 24px; padding-bottom: 24px;">
     <div class="row">
         <div class="col-md-12">
-            <h3>Requires an efis account</h3>
+            <h3 style="color: #c4454d;">Built for the Albanian fiscalisation law</h3>
+            <p>
+                Since 2021, every invoice an Albanian business issues has to be registered with the tax
+                authority (Fiskalizimi, Law 87/2019) before it reaches the customer. efis is a
+                fiscalisation platform by Metanow that does this work: it signs, numbers and registers
+                each invoice and follows it until it is settled. This module connects Odoo to efis, so
+                fiscalisation happens on posting, without a second program.
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <h4>What happens when you post an invoice</h4>
+            <ol>
+                <li>The module checks the invoice the way efis would, before a number is spent. If
+                    something is wrong, posting stops and you see the list of problems.</li>
+                <li>The invoice is sent to efis right after posting. efis registers it with the tax
+                    authority.</li>
+                <li>The fiscal number, the NIVF, the NSLF and the verification URL are written back on
+                    the invoice, and the PDF prints them with the QR code.</li>
+            </ol>
+        </div>
+        <div class="col-md-6">
+            <h4>Built to keep you compliant</h4>
+            <ul>
+                <li>An invoice sent for fiscalisation can no longer go back to draft, be cancelled or
+                    be deleted. It is corrected only by a corrective document.</li>
+                <li>A resend uses the same key, so an invoice is never registered twice.</li>
+                <li>Filters show the invoices waiting for efis and the ones that need your action.</li>
+                <li>No certificate or key is stored in Odoo. The certificate stays in efis.</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="container" style="padding-top: 24px; padding-bottom: 24px;">
+    <div class="row">
+        <div class="col-md-12">
+            <h3 style="color: #c4454d;">The efis console</h3>
+            <p>
+                Behind the module, the efis web console shows every document, its state and its
+                deadline, the certificate and the registry codes, and issues the pairing code that
+                connects Odoo.
+            </p>
+            <img src="efis_home_screenshot.png" class="img img-fluid" alt="efis home: error queue, readiness and deadlines"/>
+            <p class="text-center" style="margin-top: 8px; margin-bottom: 24px;">Home: what needs action, readiness to issue, and the legal deadlines after an interruption.</p>
+            <img src="efis_documents_screenshot.png" class="img img-fluid" alt="efis documents list"/>
+            <p class="text-center" style="margin-top: 8px; margin-bottom: 24px;">Documents: every invoice with its fiscal number, codes and state.</p>
+            <img src="efis_document_screenshot.png" class="img img-fluid" alt="efis document detail"/>
+            <p class="text-center" style="margin-top: 8px; margin-bottom: 24px;">One document: the codes, the verification URL and its history.</p>
+            <img src="efis_pairing_screenshot.png" class="img img-fluid" alt="efis pairing code"/>
+            <p class="text-center" style="margin-top: 8px;">Pairing: the single-use code that connects your Odoo.</p>
+        </div>
+    </div>
+</section>
+
+<section class="container" style="padding-top: 24px; padding-bottom: 24px;">
+    <div class="row">
+        <div class="col-md-6">
+            <h3 style="color: #c4454d;">Requires an efis account</h3>
             <p>
                 efis is an external service run by Metanow. This module is its Odoo client and does
-                nothing on its own: you need an efis account for your business, and the module pairs
-                with it using a single-use code issued in the efis web app.
+                nothing on its own: you need an efis account for your business. To get one, write to
+                <a href="mailto:support@odoo.metanow.com">support@odoo.metanow.com</a> or visit
+                metanow.com.
             </p>
-            <h3>What is sent, and when</h3>
+            <h4>What is sent, and when</h4>
             <p>
                 Nothing leaves Odoo until an administrator turns fiscalisation on in Settings and
                 pairs the company with efis. From then on, each posted customer invoice is sent to efis:
                 the seller's tax number, address and registration codes, the buyer's name, identifier,
-                address, town and country, and the invoice's lines, taxes, totals and payment method. efis fiscalises it with the Albanian tax
-                authority and returns the result.
+                address, town and country, and the invoice's lines, taxes, totals and payment method.
+                efis registers it with the Albanian tax authority and returns the result.
             </p>
         </div>
-    </div>
-</section>
-
-<section class="container">
-    <div class="row">
-        <div class="col-md-12">
-            <h3>Features</h3>
-            <ul>
-                <li>Checks the invoice as efis would before a number is spent. If efis would not accept
-                    it, the posting is rolled back with the list of problems and nothing is sent.</li>
-                <li>Queues accepted invoices and sends them right after posting. Two scheduled actions
-                    send the queue and read the states every 5 minutes.</li>
-                <li>Adds a Fiscalisation tab to the invoice with the fiscal state, the fiscal number,
-                    the issuer security code, the registration code and the verification URL.</li>
-                <li>Prints the fiscal number, the NIVF, the NSLF and the QR code of the verification URL
-                    on the invoice PDF.</li>
-                <li>Filters for invoices waiting for efis and invoices that need action.</li>
-                <li>Never lets an invoice sent for fiscalisation go back to draft, be cancelled or be
-                    deleted. It is corrected only by a corrective document.</li>
-            </ul>
-            <h3>Limits</h3>
+        <div class="col-md-6">
+            <h3 style="color: #c4454d;">Setup in four steps</h3>
+            <ol>
+                <li>Install the module. It needs Invoicing.</li>
+                <li>In efis, issue a pairing code for the channel odoo.</li>
+                <li>In Odoo Settings, turn on Fiscalisation, enter the efis address and the code, and
+                    press Pair with efis.</li>
+                <li>Enter your registration codes, map payment methods on the sales journals, and press
+                    Check the configuration.</li>
+            </ol>
+            <h4>Limits</h4>
             <ul>
                 <li>Odoo 20, Community or Enterprise, on Odoo.sh or self-hosted. Odoo Online cannot load
                     this module.</li>
                 <li>Credit notes and receipts are refused while fiscalisation is on; corrections are
                     issued from efis.</li>
             </ul>
+            <h4>Support</h4>
+            <p>
+                <a href="mailto:support@odoo.metanow.com">support@odoo.metanow.com</a>
+            </p>
         </div>
     </div>
 </section>

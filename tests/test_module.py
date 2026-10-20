@@ -169,6 +169,22 @@ class AppsStoreTests(unittest.TestCase):
         self.assertNotIn("<script", page.lower())
         self.assertNotRegex(page, r"(?i)(href|src)\s*=\s*[\"']https?://")
         self.assertNotRegex(page, r"[ëç]", "the store page must be in English")
+        # The store does not read the page as UTF-8 (the first listing showed "klientÃ«ve").
+        self.assertTrue(page.isascii(), "the store page must be plain ASCII")
+
+    def test_every_store_image_exists_and_is_a_png(self):
+        # A missing image in the manifest is a scan error, which unpublishes the repository.
+        for name in manifest()["images"]:
+            path = MODULE / name
+            self.assertTrue(path.is_file(), name)
+            self.assertEqual(path.read_bytes()[:4], b"\x89PNG", name)
+        page = (MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
+        for src in re.findall(r'src="([^"]+)"', page):
+            self.assertTrue((MODULE / "static" / "description" / src).is_file(), src)
+
+    def test_the_license_file_matches_the_manifest(self):
+        self.assertEqual(manifest()["license"], "OPL-1")
+        self.assertIn("Odoo Proprietary License v1.0", (MODULE / "LICENSE").read_text(encoding="utf-8"))
 
     def test_the_module_is_free_and_licensed(self):
         self.assertNotIn("price", manifest())
