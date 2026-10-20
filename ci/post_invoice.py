@@ -96,7 +96,9 @@ finally:
 
 assert move.metanow_fiscal_state == "registered", (move.metanow_fiscal_state, move.metanow_fiscal_error)
 assert move.metanow_fiscal_registration_code
-assert move.metanow_fiscal_verification_url
+# This invoice is non-cash and carries no device, so efis deliberately gives no verification URL
+# (DEV-1816 is still open on what a non-cash document presents). Pinned so a change is seen here.
+assert not move.metanow_fiscal_verification_url, move.metanow_fiscal_verification_url
 
 try:
     move.button_draft()
