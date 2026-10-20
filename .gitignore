@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+dist/
+odoo-install*.log
+
+# Certificates and keys are never committed.
+secrets/
+*.pfx
+*.p12
+*.pem
+*.key
+.env

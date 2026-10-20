@@ -7,9 +7,10 @@ import urllib.error
 from pathlib import Path
 
 ODOO_DIR = Path(__file__).resolve().parents[1]
-REPO = ODOO_DIR.parent
+REPO = ODOO_DIR
 MODULE_DIR = ODOO_DIR / "metanow_fiscalization"
-OPENAPI = REPO / "spec" / "openapi" / "v1.json"
+# efis's published API, copied from the efis version EFIS_IMAGE names. contract/README.md.
+OPENAPI = REPO / "contract" / "efis-openapi-v1.json"
 
 if str(ODOO_DIR) not in sys.path:
     sys.path.insert(0, str(ODOO_DIR))

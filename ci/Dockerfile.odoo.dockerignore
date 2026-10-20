@@ -1,28 +1,15 @@
-# BuildKit uses this file instead of the root .dockerignore when building odoo/ci/Dockerfile.odoo
+# BuildKit uses this file instead of the root .dockerignore when building ci/Dockerfile.odoo
 # (and only then). It is the root list without dist/: this image copies the module from
-# dist/odoo/addons, which the odoo-package job unpacked. The root list drops dist/, which
-# failed odoo-install on pipeline #5323 with "/dist/odoo/addons/metanow_fiscalization": not found.
-bin/
-obj/
-node_modules/
-web/dist/
+# dist/odoo/addons, which the package job unpacked.
+.git/
 **/__pycache__/
 **/*.pyc
-.git/
-.vs/
-.idea/
-artifacts/
-test-results/
-**/*.user
 
-# Certificate material, at any depth. A pattern without a separator matches
-# only at the context root, so secrets/cert.p12 needs the **/ prefix.
 secrets/
 **/*.pfx
 **/*.p12
 **/*.pem
 **/*.key
 **/*.password
-
 .env
 **/.env

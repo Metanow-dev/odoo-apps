@@ -1,0 +1,246 @@
+# EFIS_POSTGRES_PASSWORD is the database password. Set it in the server
+# environment or a gitignored .env beside this file. The variable name is
+# documented in deploy/postgres.env.example. This file has no password.
+#
+# EFIS_IMAGE is the image CI published. Deploy sets
+# $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA and the server pulls it.
+# Local default: efis:local.
+
+services:
+  postgres:
+    # Pinned to a minor version and a Debian suite (DEV-1808): a floating postgres:17 let a
+    # deploy move the engine with nothing to roll back to. Moving it is a reviewed change to
+    # this line, deploy/postgres/Dockerfile, compose.app-role.yml and the CI store service,
+    # which verify-backup-lane.py keeps equal. No WAL archiving here: compose.backup.yml
+    # turns it on (runbook section 10).
+    image: postgres:17.11-trixie
+    environment:
+      POSTGRES_USER: efis
+      POSTGRES_PASSWORD: "${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
+      POSTGRES_DB: efis
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U efis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # The api never migrates. This one-shot service does, before anything serves, and
+  # the api refuses to start if the schema is not at the version its binary expects:
+  # an api that accepts a document it cannot durably record issues a fiscal number
+  # that disappears on the next restart.
+  migrate:
+    image: "${EFIS_IMAGE:-efis:local}"
+    pull_policy: "${EFIS_PULL_POLICY:-missing}"
+    build: .
+    entrypoint: ["dotnet", "/opt/efis/migrate/Efis.Migrate.dll"]
+    restart: "no"
+    environment:
+      ConnectionStrings__PostgresMigrator: "Host=postgres;Database=efis;Username=efis;Password=${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    # Time to stop cleanly on docker stop: ASP.NET finishes requests in flight within its 30-second shutdown timeout.
+    stop_grace_period: 35s
+    image: "${EFIS_IMAGE:-efis:local}"
+    pull_policy: "${EFIS_PULL_POLICY:-missing}"
+    build: .
+    environment:
+      # Production unless a deployment says otherwise: Development shows stack traces.
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
+      # Selects the verification URL printed on every document. Required, with no
+      # default, because a production stack silently falling back to Test would print a
+      # buyer-facing link that does not verify.
+      Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
+      # Authorises POST /v1/tenants and nothing else. Required, with no default, because
+      # the alternative is a deployment where a stranger can create tenants. It is one
+      # secret for the whole stack and it names no partner: see ProvisioningKey for what
+      # it deliberately is not.
+      Efis__Provisioning__Key: "${EFIS_PROVISIONING_KEY:?EFIS_PROVISIONING_KEY is required: at least 32 characters, generated not chosen}"
+      # Interim, until accounts and grants exist (DEV-1745, DEV-1747): the tax id the demo
+      # console login files under. Empty means the demo tenant. Set on a test deployment
+      # only, to sign in to a real taxpayer's test tenant.
+      Efis__Console__PersonTaxId: "${EFIS_CONSOLE_TAX_ID:-}"
+      # The first admin. The first sign-in with exactly these creates the admin account and
+      # keeps only a hash; after that the stored password is the one that counts. Optional:
+      # empty means no admin is created and nothing else changes.
+      Efis__Admin__Email: "${EFIS_ADMIN_EMAIL:-}"
+      Efis__Admin__Password: "${EFIS_ADMIN_PASSWORD:-}"
+      ConnectionStrings__Postgres: "Host=postgres;Database=efis;Username=efis;Password=${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
+      # Error reporting. Off unless set: there is no default destination for errors.
+      Sentry__Dsn: "${EFIS_SENTRY_DSN:-}"
+      # Webhooks. Derives every endpoint's signing secret; at least 32 characters, generated
+      # (openssl rand -base64 32). Optional: empty means the webhook routes answer 503 and
+      # nothing is sent. Changing it changes every endpoint's secret at once.
+      Efis__Webhooks__Key: "${EFIS_WEBHOOKS_KEY:-}"
+      # Document submissions per taxpayer per minute, per api replica. Empty means 600; 0 turns
+      # the limit off.
+      Efis__RateLimits__DocumentWritesPerMinute: "${EFIS_RATE_LIMIT_PER_MINUTE:-}"
+      # BUILD_SPEC 4.9, code 40 (DEV-1721): the most a cash invoice between two taxpayers may
+      # carry, and the date it applies from. Empty means 100000.00 from 2026-01-01.
+      Efis__Albania__CashCeilingBetweenTaxpayers: "${EFIS_CASH_CEILING:-}"
+      Efis__Albania__CashCeilingFrom: "${EFIS_CASH_CEILING_FROM:-}"
+      # Compliance metrics (ARCHITECTURE 55) at /metrics, Prometheus text, for a scraper on
+      # the host. Empty means the route answers 404. Generated (openssl rand -base64 32).
+      Efis__Metrics__Token: "${EFIS_METRICS_TOKEN:-}"
+      # DEV-1773: an answer ZIP imported from the authority's portal is checked against the same
+      # signer the worker trusts (BUILD_SPEC 4.6). The same three settings as the worker's.
+      EFIS_GATEWAY_SIGNER: "${EFIS_GATEWAY_SIGNER:-authority}"
+      EFIS_AUTHORITY_SIGNER_CN: "${EFIS_AUTHORITY_SIGNER_CN:-GDT eFiskalizimi}"
+      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-AKSHI}"
+      # The signer's socket. The api holds no key; it asks the signer, over a socket only
+      # the containers that mount this volume can reach.
+      Signer__Socket: /run/efis-signer/signer.sock
+    volumes:
+      - signer-socket:/run/efis-signer
+    ports:
+      # Loopback only: the host's Caddy is the way in, with TLS (deploy/Caddyfile).
+      - "127.0.0.1:${API_BIND_PORT:-8080}:8080"
+    # Readiness, not liveness: the database answered, the schema is current and the signer answers. The image
+    # has no curl, so the probe is bash's /dev/tcp.
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080
+          && printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3
+          && head -n 1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      signer:
+        condition: service_healthy
+
+  worker:
+    # Time to stop cleanly on docker stop: one send (15 s timeout) and its signing finish and are recorded before the process exits.
+    stop_grace_period: 60s
+    image: "${EFIS_IMAGE:-efis:local}"
+    pull_policy: "${EFIS_PULL_POLICY:-missing}"
+    build: .
+    entrypoint: ["dotnet", "/opt/efis/worker/Efis.Worker.dll"]
+    environment:
+      ConnectionStrings__Postgres: "Host=postgres;Database=efis;Username=efis;Password=${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
+      EFIS_HEARTBEAT_FILE: /tmp/efis-heartbeat
+      # Where the worker sends. Empty means it sends nothing -- there is deliberately no
+      # default. Live tenants only; sandbox twins go to EFIS_SANDBOX_GATEWAY_ENDPOINT. On a
+      # test-only deployment it may be the mock (http://mock-cis:8080/FiscalizationService-v3,
+      # with EFIS_GATEWAY_SIGNER=mock). Pointing it at the authority is a decision, not a default.
+      EFIS_GATEWAY_ENDPOINT: "${EFIS_GATEWAY_ENDPOINT:-}"
+      # Whose signature an answer must carry before it counts (BUILD_SPEC 4.6). "authority" by
+      # default; "mock" only on a test deployment, and a Production deployment refuses it.
+      EFIS_GATEWAY_SIGNER: "${EFIS_GATEWAY_SIGNER:-authority}"
+      # Where sandbox twins' documents go (builder-log 30.7): the mock, only ever. Live tenants'
+      # documents never go here; sandbox tenants' never go to EFIS_GATEWAY_ENDPOINT.
+      EFIS_SANDBOX_GATEWAY_ENDPOINT: "${EFIS_SANDBOX_GATEWAY_ENDPOINT:-http://mock-cis:8080/FiscalizationService-v3}"
+      # BUILD_SPEC 4.6: the authority's certificate is "issued by AKSHI CA, and CN contains
+      # GDT eFiskalizimi". Configuration, not source, like the production address. Check both
+      # against the first real answer (DEV-1695) before go-live.
+      EFIS_AUTHORITY_SIGNER_CN: "${EFIS_AUTHORITY_SIGNER_CN:-GDT eFiskalizimi}"
+      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-AKSHI}"
+      # The contract a request is validated against before it is sent: the host's (DEV-1815).
+      Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
+      Signer__Socket: /run/efis-signer/signer.sock
+      # DEV-1733: a second copy of every attempt's signed request and response bytes in object
+      # storage, by SHA-256, copied after the fact on its own loop. Empty means off, and Postgres
+      # is the only copy. "s3" needs the five EFIS_ARCHIVE_S3_* values; the worker refuses to start
+      # with a store named and a value missing. A failed copy is retried and never touches a
+      # submission. Runbook section 10.
+      EFIS_ARCHIVE_STORE: "${EFIS_ARCHIVE_STORE:-}"
+      EFIS_ARCHIVE_S3_ENDPOINT: "${EFIS_ARCHIVE_S3_ENDPOINT:-}"
+      EFIS_ARCHIVE_S3_BUCKET: "${EFIS_ARCHIVE_S3_BUCKET:-}"
+      EFIS_ARCHIVE_S3_REGION: "${EFIS_ARCHIVE_S3_REGION:-}"
+      EFIS_ARCHIVE_S3_ACCESS_KEY_ID: "${EFIS_ARCHIVE_S3_ACCESS_KEY_ID:-}"
+      EFIS_ARCHIVE_S3_SECRET_ACCESS_KEY: "${EFIS_ARCHIVE_S3_SECRET_ACCESS_KEY:-}"
+    volumes:
+      - signer-socket:/run/efis-signer
+    # The worker has no port. It touches this file every 15 seconds, and only after its
+    # database answered, so a file older than a minute means it has lost its store.
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/efis-heartbeat -mmin -1 | grep -q ."]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      signer:
+        condition: service_healthy
+
+  # The signer: the only process that holds a tenant's key (DEV-1807). It listens on a
+  # Unix socket in a volume shared with the api, never on a port. It writes key_access,
+  # so it needs the database and the schema. Keys are in memory: a restart loses them and
+  # tenants re-upload, unless EFIS_SIGNER_SEALING_KEY_FILE is set, in which case each key
+  # is also kept sealed in the database and loaded again on start. That is allowed on a
+  # Test deployment only -- the signer refuses to start with it anywhere else -- because
+  # where production keys are kept is DEV-1692's decision. On a test server, set
+  #   EFIS_SIGNER_SEALING_KEY_FILE=/var/lib/efis-signer/sealing.key
+  # once. The key file is created on first start in the signer-keys volume, which only
+  # this service mounts; removing that volume makes every sealed key unreadable.
+  signer:
+    image: "${EFIS_IMAGE:-efis:local}"
+    pull_policy: "${EFIS_PULL_POLICY:-missing}"
+    build: .
+    entrypoint: ["dotnet", "/opt/efis/signer/Efis.Signer.Host.dll"]
+    environment:
+      ConnectionStrings__Postgres: "Host=postgres;Database=efis;Username=efis;Password=${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
+      Signer__Socket: /run/efis-signer/signer.sock
+      Signer__SealingKeyFile: "${EFIS_SIGNER_SEALING_KEY_FILE:-}"
+      Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
+      EFIS_HEARTBEAT_FILE: /tmp/efis-heartbeat
+    volumes:
+      - signer-socket:/run/efis-signer
+      - signer-keys:/var/lib/efis-signer
+    # Touched every 15 seconds, and only after the database answered: a signer that cannot
+    # write key_access refuses to sign, so it is not healthy.
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/efis-heartbeat -mmin -1 | grep -q ."]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The mock authority. It implements the archived fiscalization contract so the whole
+  # submission path runs on every commit instead of nightly against a government endpoint,
+  # and so a partner has somewhere to integrate: real test access is identity-bound to a
+  # named company. It never submits anywhere -- it is the thing being submitted to.
+  #
+  # It runs on every deployment, production included, because sandbox twins live beside their
+  # businesses (builder-log 30.7): the worker sends a sandbox tenant's documents here and nowhere
+  # else, and a live tenant's never here. Reachable only from the stack's network and the host's
+  # loopback.
+  mock-cis:
+    image: "${EFIS_IMAGE:-efis:local}"
+    pull_policy: "${EFIS_PULL_POLICY:-missing}"
+    build: .
+    entrypoint: ["dotnet", "/opt/efis/mockcis/Efis.MockCis.dll"]
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      # Deterministic echoes the request's SendDateTime so the same request always gets the
+      # same response. Wall stamps the real clock and is not reproducible.
+      MockCis__Clock: "${EFIS_MOCKCIS_CLOCK:-Deterministic}"
+    ports:
+      - "127.0.0.1:${MOCK_CIS_BIND_PORT:-8090}:8080"
+
+volumes:
+  pgdata:
+  signer-socket:
+  signer-keys:

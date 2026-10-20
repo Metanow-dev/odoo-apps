@@ -1,9 +1,9 @@
 # DEV-1731: a disposable Odoo 20 beside the efis stack, for the odoo-install CI job only.
-# Used as an override of the root compose.yml (docker compose -f compose.yml -f odoo/ci/compose.odoo.yml).
-# Paths are relative to the repository root, the project directory.
+# Used as an override of efis's compose file (docker compose --project-directory . -f ci/efis-compose.yml -f ci/compose.odoo.yml).
+# Paths are relative to the repository root, which odoo-install.sh passes as the project directory.
 #
 # Everything here is thrown away when the job ends. The worker sends to the mock authority and
-# nowhere else (odoo/ci/odoo-install.sh refuses any other endpoint). Odoo talks to efis's api
+# nowhere else (ci/odoo-install.sh refuses any other endpoint). Odoo talks to efis's api
 # only; it holds no certificate and no key.
 
 services:
@@ -25,7 +25,7 @@ services:
   odoo:
     build:
       context: .
-      dockerfile: odoo/ci/Dockerfile.odoo
+      dockerfile: ci/Dockerfile.odoo
       args:
         ODOO_IMAGE: "${EFIS_ODOO_IMAGE:-odoo:20.0}"
     environment:
@@ -40,7 +40,7 @@ services:
   driver:
     build:
       context: .
-      dockerfile: odoo/ci/Dockerfile.driver
+      dockerfile: ci/Dockerfile.driver
     environment:
       EFIS_BASE_URL: http://api:8080
       EFIS_PROVISIONING_KEY: "${EFIS_PROVISIONING_KEY:?EFIS_PROVISIONING_KEY is required}"

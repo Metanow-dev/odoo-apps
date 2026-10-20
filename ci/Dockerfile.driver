@@ -3,5 +3,5 @@
 # the Odoo module never sees the certificate.
 FROM python:3.13-slim
 RUN pip install --no-cache-dir cryptography==44.0.2
-COPY odoo/ci/provision.py /ci/provision.py
+COPY ci/provision.py /ci/provision.py
 ENTRYPOINT ["python", "/ci/provision.py"]

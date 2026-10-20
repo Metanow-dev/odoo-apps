@@ -144,7 +144,7 @@ class ManifestTests(unittest.TestCase):
 
 
 class AppsStoreTests(unittest.TestCase):
-    """The Odoo Apps store lists the module from efis/odoo-apps (WORKFLOW.md). It reads the icon and
+    """The Odoo Apps store lists the module from branch 20.0 (README.md). It reads the icon and
     the description page from static/description, and a manifest with a price is a paid app."""
 
     def test_the_store_icon_is_a_png(self):

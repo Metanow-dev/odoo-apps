@@ -2,8 +2,10 @@
 # DEV-1731: install metanow_fiscalization into a disposable Odoo 20 and post one invoice through
 # efis to the mock authority. Run by the odoo-install CI job, in docker:27 with a dind service.
 #
-# Needs: EFIS_IMAGE (the efis image CI built for this commit), dist/odoo/addons (the unpacked zip
-# from odoo-package), and optionally EFIS_ODOO_IMAGE (default odoo:20.0).
+# Needs: EFIS_IMAGE (the efis image this repository is tested against, pinned in .gitlab-ci.yml),
+# ci/efis-compose.yml (efis's compose.yml from that same version, see contract/README.md),
+# dist/odoo/addons (the unpacked zip from the package job), and optionally EFIS_ODOO_IMAGE
+# (default odoo:20.0).
 set -eu
 
 MOCK_ENDPOINT="http://mock-cis:8080/FiscalizationService-v3"
@@ -33,7 +35,7 @@ export EFIS_POSTGRES_PASSWORD EFIS_PROVISIONING_KEY EFIS_ADMIN_EMAIL EFIS_ADMIN_
 # runner's shared daemon, and a fixed project name let two concurrent jobs recreate and tear down
 # each other's containers (pipelines #5321 and #5322).
 PROJECT="efis-odoo-ci-${CI_JOB_ID:-local-$$}"
-compose() { docker compose -p "$PROJECT" -f compose.yml -f odoo/ci/compose.odoo.yml "$@"; }
+compose() { docker compose -p "$PROJECT" --project-directory . -f ci/efis-compose.yml -f ci/compose.odoo.yml "$@"; }
 trap 'compose --profile odoo logs --no-color migrate api worker mock-cis > odoo-install-efis.log 2>&1 || true; compose --profile odoo down -v --remove-orphans > /dev/null 2>&1 || true' EXIT
 
 compose up -d api worker mock-cis
@@ -61,6 +63,6 @@ compose --profile odoo run --rm -T \
   -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)" \
   -e EFIS_OPERATOR_CODE="$(field operatorCode)" \
   -e EFIS_SOFTWARE_CODE="$(field softwareCode)" \
-  odoo odoo shell -d ci < odoo/ci/post_invoice.py | tee -a odoo-install.log
+  odoo odoo shell -d ci < ci/post_invoice.py | tee -a odoo-install.log
 
 grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not fiscalised through efis." >&2; exit 1; }

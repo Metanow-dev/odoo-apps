@@ -1,0 +1,16 @@
+# The root list, used for ci/Dockerfile.driver. ci/Dockerfile.odoo has its own list, which keeps
+# dist/ because that image copies the module from the unpacked zip.
+.git/
+dist/
+**/__pycache__/
+**/*.pyc
+
+# Certificate material, at any depth.
+secrets/
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.password
+.env
+**/.env

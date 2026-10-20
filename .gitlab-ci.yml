@@ -1,0 +1,110 @@
+# The Odoo module's pipeline. README.md, "Branches and releases".
+#
+# develop: test, package, install into Odoo beside efis.
+# main:    the same, then release: publish the zip to the package registry and move the series
+#          branch (20.0), which GitHub mirrors and the Odoo Apps store reads.
+# 20.0:    written only by the release job. No pipeline runs on it.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"
+
+stages:
+  - test
+  - package
+  - install
+  - release
+
+variables:
+  # The Odoo series this branch builds. The manifest's version must start with it.
+  ODOO_SERIES: "20.0"
+  # The efis version the module is tested against. Move it together with the two copies listed
+  # in contract/README.md, never on its own.
+  EFIS_IMAGE: "cloud3.cloud-blueberry.com/efis/efis:c6418facf78c143959e7e4a1e7f820be6e52d5e5"
+  EFIS_ODOO_IMAGE: "odoo:20.0"
+
+test:
+  stage: test
+  image: python:3.13-alpine
+  script:
+    - python -m unittest discover -s tests -t tests -v
+    - |
+      python - <<'EOF'
+      import ast, os, sys
+      version = ast.literal_eval(open("metanow_fiscalization/__manifest__.py", encoding="utf-8").read())["version"]
+      series = os.environ["ODOO_SERIES"]
+      sys.exit(0 if version.startswith(series + ".") else f"manifest version {version} is not for series {series}")
+      EOF
+
+# DEV-1766: one zip for every customer, byte-identical on every rebuild, with its SHA-256 and a
+# manifest.json for the efis web app's Plugins page.
+package:
+  stage: package
+  image: python:3.13-alpine
+  script:
+    - python tools/package.py --out dist/odoo --manifest
+    - python -m zipfile -e dist/odoo/metanow_fiscalization-*.zip dist/odoo/addons
+    - cat dist/odoo/*.sha256
+  artifacts:
+    paths:
+      - dist/odoo/
+    expire_in: 90 days
+
+# DEV-1731: the zip installed into a disposable Odoo beside the pinned efis image, posting one
+# invoice through efis to the mock authority. ci/odoo-install.sh refuses any other endpoint, and
+# nothing here reaches the authority. Pulling EFIS_IMAGE needs this project on efis/efis's job
+# token allowlist (README.md, "Setting up").
+install:
+  stage: install
+  resource_group: odoo-install
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  needs: [package]
+  script:
+    - printf '%s\n' "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "${EFIS_IMAGE%%/*}"
+    - sh ci/odoo-install.sh
+  artifacts:
+    when: always
+    paths:
+      - odoo-install.log
+      - odoo-install-efis.log
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+
+# A release is a new version. The zip goes to this project's package registry under its version,
+# where a version is written once: re-releasing the same version fails here, so bump `version` in
+# the manifest first. Then the series branch moves to this commit. The push is not forced, so a
+# commit made on 20.0 by hand fails the release instead of being overwritten.
+release:
+  stage: release
+  image: alpine:3.21
+  needs: [test, package, install]
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  before_script:
+    - apk add --no-cache git curl
+  script:
+    - |
+      test -n "$ODOO_APPS_PUSH_TOKEN" || { echo "ODOO_APPS_PUSH_TOKEN must be set, protected and masked: a project access token of this project, Maintainer, write_repository." >&2; exit 1; }
+    - ZIP="$(ls dist/odoo/metanow_fiscalization-*.zip)"
+    - VERSION="$(basename "$ZIP" .zip | sed 's/^metanow_fiscalization-//')"
+    - PACKAGE_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/metanow_fiscalization/${VERSION}"
+    - |
+      if curl -fsS -o /dev/null --header "JOB-TOKEN: $CI_JOB_TOKEN" "$PACKAGE_URL/$(basename "$ZIP")"; then
+        echo "Version $VERSION is already released. Bump version in metanow_fiscalization/__manifest__.py." >&2; exit 1
+      fi
+    - |
+      for file in "$ZIP" "$ZIP.sha256" dist/odoo/manifest.json; do
+        curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$file" "$PACKAGE_URL/$(basename "$file")?select=package_file" > /dev/null
+      done
+    - git push "https://release:${ODOO_APPS_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "HEAD:refs/heads/${ODOO_SERIES}"
