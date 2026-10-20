@@ -16,11 +16,14 @@ from decimal import Decimal
 from . import money
 from .profile import (
     COUNTRY_CODES,
-    CURRENCIES,
     EXEMPTIONS,
     IDENTIFIER_TYPES,
     PAYMENT_METHODS,
 )
+
+
+# The national currency, which efis and the authority's request leave implicit.
+NATIONAL_CURRENCY = "ALL"
 
 
 class PayloadInvalid(ValueError):
@@ -66,13 +69,14 @@ def build(invoice, config, profile):
     if not reference:
         problems.append("Fatura nuk ka numër. / The invoice has no number.")
 
+    # The profile's currency list is the authority's foreign-currency codes and does not contain
+    # the lek: a lek invoice carries no Currency element, and efis reads an absent payment
+    # currency as the national one (DocumentContracts.PaymentInput, CanonicalDraft.NationalCurrency).
     currency = _text(invoice.get("currency"))
-    if currency != _text(invoice.get("company_currency")):
+    if currency != _text(invoice.get("company_currency")) or currency != NATIONAL_CURRENCY:
         problems.append(
             "Faturat në monedhë të huaj nuk fiskalizohen ende nga ky modul. "
             "/ Invoices in a foreign currency are not fiscalised by this module yet.")
-    elif currency not in profile.codes(CURRENCIES):
-        problems.append(f"Monedha {currency} nuk njihet nga efis. / efis does not know the currency {currency}.")
 
     method = _text(invoice.get("payment_method"))
     if not method:
@@ -143,7 +147,6 @@ def build(invoice, config, profile):
         "payments": [{
             "method": method,
             "amount": money.format_money(total),
-            "currency": currency,
         }],
         "total": money.format_money(total),
     }

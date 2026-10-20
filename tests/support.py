@@ -39,7 +39,7 @@ PROFILE_DOCUMENT = {
             {"code": "BANKNOTE", "description": None, "flags": {"cash": True}},
         ]},
         {"field": "payments.currency", "source": "test", "values": [
-            {"code": "ALL", "description": None, "flags": {}},
+            # As the real profile publishes it: the XSD's CurrencyCodeSType, which has no ALL.
             {"code": "EUR", "description": None, "flags": {}},
         ]},
         {"field": "seller.countryCode, buyer.countryCode", "source": "test", "values": [

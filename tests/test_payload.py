@@ -67,7 +67,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(body["clientSystem"], "odoo")
         self.assertEqual(body["clientReference"], "INV/2026/00001")
         self.assertEqual(body["total"], "240.00")
-        self.assertEqual(body["payments"], [{"method": "ACCOUNT", "amount": "240.00", "currency": "ALL"}])
+        self.assertEqual(body["payments"], [{"method": "ACCOUNT", "amount": "240.00"}])
         self.assertEqual(body["lines"], [{
             "description": "Karrige",
             "unit": "copë",
@@ -123,6 +123,16 @@ class PayloadTests(unittest.TestCase):
     def test_foreign_currency_is_refused(self):
         with self.assertRaises(PayloadInvalid):
             build(support.invoice(currency="EUR"), support.config(), support.profile())
+
+    def test_a_lek_invoice_passes_though_the_profile_lists_no_lek(self):
+        # Pipeline #5319: the real profile's currency list has no ALL, so the old check refused
+        # every lek invoice. The payment carries no currency, which efis reads as the lek.
+        payload = build(support.invoice(), support.config(), support.profile())
+        self.assertNotIn("currency", payload["payments"][0])
+
+    def test_a_company_keeping_books_in_another_currency_is_refused(self):
+        with self.assertRaises(PayloadInvalid):
+            build(support.invoice(currency="EUR", company_currency="EUR"), support.config(), support.profile())
 
     def test_rate_not_in_the_profile_is_refused(self):
         taxed = support.line(price_total=230.0, taxes=[{"amount_type": "percent", "amount": 15.0, "exemption": False}])
