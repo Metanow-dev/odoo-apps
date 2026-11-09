@@ -96,9 +96,12 @@ finally:
 
 assert move.metanow_fiscal_state == "registered", (move.metanow_fiscal_state, move.metanow_fiscal_error)
 assert move.metanow_fiscal_registration_code
-# This invoice is non-cash and carries no device, so efis deliberately gives no verification URL
-# (DEV-1816 is still open on what a non-cash document presents). Pinned so a change is seen here.
-assert not move.metanow_fiscal_verification_url, move.metanow_fiscal_verification_url
+# Every invoice carries a QR (Udhezim 16 Art. 12(1)). This one is non-cash and has no device, so
+# efis gives its verification URL without the cr parameter (DEV-1816, working answer of 5 Nov 2026,
+# to be checked on the test verifier, DEV-1695). Pinned so a change is seen here.
+url = move.metanow_fiscal_verification_url
+assert url, "a non-cash invoice came back without a verification URL"
+assert "iic=" in url and "&cr=" not in url and "?cr=" not in url, url
 
 try:
     move.button_draft()
