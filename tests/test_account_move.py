@@ -72,7 +72,7 @@ def move(env, owner, **overrides):
         currency_id=SimpleNamespace(name="ALL"),
         journal_id=SimpleNamespace(metanow_fiscal_payment_method="ACCOUNT"),
         commercial_partner_id=SimpleNamespace(
-            name="Blerës sh.p.k.", vat="L98765432K", metanow_fiscal_identifier_type=False,
+            name="Blerës sh.p.k.", vat="L98765432K", metanow_fiscal_identifier_type=False, is_company=True,
             street="Rruga 2", street2=False, city="Durrës", country_id=False),
         invoice_line_ids=[invoice_line(), invoice_line(display_type="line_note", name="Shënim")],
         amount_total=240.0,
@@ -148,6 +148,28 @@ class SendTests(unittest.TestCase):
         self.assertEqual(sent["headers"]["idempotency-key"], "odoo-db-0001-42-1")
         self.assertEqual(sent["body"]["clientReference"], "INV/2026/00001")
         self.assertEqual(len(sent["body"]["lines"]), 1, "a note line is not an invoice line")
+        self.assertEqual(sent["body"]["buyer"]["kind"], "business", "a company partner is a business")
+
+    def test_a_person_partner_carries_no_kind(self):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        buyer = SimpleNamespace(
+            name="Arben Hoxha", vat=False, metanow_fiscal_identifier_type=False, is_company=False,
+            street="Rruga 3", street2=False, city="Tiranë", country_id=False)
+        record = move(env, company(env, opener=opener), commercial_partner_id=buyer)
+        record._post()
+        record._metanow_fiscal_send()
+        self.assertNotIn("kind", opener.requests[0]["body"]["buyer"])
+
+    def test_the_poll_stores_efis_warnings_on_the_invoice(self):
+        record, _ = self.queued(
+            (202, support.document_response()),
+            (200, support.document_response(warnings=["buyer_identified_by_passport"])))
+        record._metanow_fiscal_send()
+        record.writes.clear()
+        record._metanow_fiscal_poll()
+        self.assertEqual(len(record.writes), 1)
+        self.assertEqual(record.metanow_fiscal_warnings, "buyer_identified_by_passport")
 
     def test_a_refusal_is_parked_once_and_not_resent(self):
         record, opener = self.queued((422, {"code": "buyer_tax_id_unknown", "retryable": False, "authorityCode": None}))

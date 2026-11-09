@@ -22,6 +22,10 @@ from .profile import (
 )
 
 
+# PartyInput.kind's values. The module only ever sends BUSINESS.
+BUSINESS = "business"
+BUYER_KINDS = (BUSINESS,)
+
 # The national currency, which efis and the authority's request leave implicit.
 NATIONAL_CURRENCY = "ALL"
 
@@ -275,6 +279,15 @@ def _buyer(buyer, profile):
     country = _text(buyer.get("country_code"))
     if country is not None and country not in profile.codes(COUNTRY_CODES):
         problems.append(f"Kodi i vendit {country} nuk njihet nga efis. / efis does not know the country code {country}.")
+    # PartyInput.kind (DEV-2028). Only "business" is sent: it tells efis that a buyer with no tax
+    # or VAT number, such as a foreign company, is not an individual. A person is left to efis's
+    # own default, read from the identifier, so a sole trader with a tax number is not called an
+    # individual.
+    kind = _text(buyer.get("kind"))
+    if kind is not None:
+        if kind not in BUYER_KINDS:
+            problems.append(f"Lloji i blerësit {kind} nuk njihet. / The buyer kind {kind} is not known.")
+        party["kind"] = kind
     _put(party, "address", _text(buyer.get("address")))
     _put(party, "town", _text(buyer.get("town")))
     _put(party, "countryCode", country)

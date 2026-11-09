@@ -88,5 +88,53 @@ class WriteOnceTests(unittest.TestCase):
         self.assertIn(outcome.odoo_state("something_new"), outcome.POLLED)
 
 
+class EfisStateTests(unittest.TestCase):
+    def test_every_state_efis_publishes_is_mapped_on_purpose(self):
+        schemas = support.openapi()["components"]["schemas"]
+        for schema in ("DocumentResponse", "DocumentDetailResponse"):
+            published = set(schemas[schema]["properties"]["state"]["enum"])
+            self.assertEqual(published - outcome.KNOWN_EFIS_STATES, set(), schema)
+
+    def test_a_draft_in_efis_is_not_numbered_and_is_read_again(self):
+        self.assertEqual(outcome.odoo_state("draft"), outcome.SENT)
+        self.assertIn(outcome.odoo_state("draft"), outcome.POLLED)
+        values = outcome.document_values(EMPTY, support.document_response(
+            state="draft", fiscalNumber=None, securityCode=None, verificationUrl=None))
+        self.assertEqual(values[outcome.EFIS_STATE], "draft")
+        self.assertNotIn(outcome.SECURITY_CODE, values)
+
+
+class WarningTests(unittest.TestCase):
+    def stored(self):
+        current = outcome.document_values(EMPTY, support.document_response())
+        current.update({
+            outcome.DOCUMENT_ID: support.document_response()["id"],
+            outcome.FISCAL_NUMBER: "1/2026/bb123bb123",
+            outcome.SECURITY_CODE: support.SECURITY_CODE,
+            outcome.VERIFICATION_URL: support.document_response()["verificationUrl"],
+        })
+        return current
+
+    def test_a_read_stores_efis_warnings(self):
+        answer = support.document_response(warnings=["buyer_identified_by_passport"])
+        values = outcome.poll_values(self.stored(), Response(200, answer))
+        self.assertEqual(values[outcome.WARNINGS], "buyer_identified_by_passport")
+
+    def test_several_warnings_are_one_per_line(self):
+        answer = support.document_response(warnings=["first", "second"])
+        values = outcome.document_values(EMPTY, answer)
+        self.assertEqual(values[outcome.WARNINGS], "first\nsecond")
+
+    def test_an_answer_without_the_list_leaves_stored_warnings_alone(self):
+        values = outcome.submission_values(EMPTY, Response(202, support.document_response()))
+        self.assertNotIn(outcome.WARNINGS, values)
+
+    def test_an_empty_list_clears_them(self):
+        current = self.stored()
+        current[outcome.WARNINGS] = "buyer_identified_by_passport"
+        values = outcome.poll_values(current, Response(200, support.document_response(warnings=[])))
+        self.assertIs(values[outcome.WARNINGS], False)
+
+
 if __name__ == "__main__":
     unittest.main()

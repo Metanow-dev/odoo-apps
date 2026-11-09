@@ -1,6 +1,76 @@
 {
   "components": {
     "schemas": {
+      "AccountResponse": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "twoFactor": {
+            "default": "off",
+            "type": "string"
+          },
+          "twoFactorRecommended": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "type": "object"
+      },
+      "AccountSessionListResponse": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/AccountSessionResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions"
+        ],
+        "type": "object"
+      },
+      "AccountSessionResponse": {
+        "properties": {
+          "current": {
+            "type": "boolean"
+          },
+          "device": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "signedInAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "signedInAt",
+          "expiresAt",
+          "current"
+        ],
+        "type": "object"
+      },
       "ActivityItem": {
         "properties": {
           "actor": {
@@ -384,6 +454,115 @@
         ],
         "type": "object"
       },
+      "BusinessProfileRequest": {
+        "properties": {
+          "numberingAct": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NumberingActBody"
+              }
+            ]
+          },
+          "usesCash": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "usesEinvoices": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "usesTransport": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "required": [
+          "usesCash",
+          "usesTransport",
+          "usesEinvoices",
+          "numberingAct"
+        ],
+        "type": "object"
+      },
+      "BusinessProfileResponse": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "numberingAct": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NumberingActBody"
+              }
+            ]
+          },
+          "numberingActFile": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NumberingActFileResponse"
+              }
+            ]
+          },
+          "numberingFrozen": {
+            "type": "boolean"
+          },
+          "numberingModel": {
+            "type": "string"
+          },
+          "taxId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "usesCash": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "usesEinvoices": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "usesTransport": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "required": [
+          "tenantId",
+          "name",
+          "taxId",
+          "numberingModel",
+          "numberingFrozen",
+          "usesCash",
+          "usesTransport",
+          "usesEinvoices",
+          "numberingAct",
+          "numberingActFile"
+        ],
+        "type": "object"
+      },
       "BusinessResponse": {
         "properties": {
           "createdAt": {
@@ -740,6 +919,27 @@
           "thumbprint",
           "notAfter",
           "keyReference"
+        ],
+        "type": "object"
+      },
+      "ChangePasswordRequest": {
+        "properties": {
+          "currentPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
         ],
         "type": "object"
       },
@@ -1304,6 +1504,23 @@
         ],
         "type": "object"
       },
+      "DeclareReasonRequest": {
+        "properties": {
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "why": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "DeviceRegistrationListResponse": {
         "properties": {
           "registrations": {
@@ -1549,6 +1766,12 @@
             },
             "type": "array"
           },
+          "projectReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "selfIssueKind": {
             "type": [
               "null",
@@ -1736,6 +1959,19 @@
             "type": "boolean"
           },
           "state": {
+            "description": "Where the document is. numbered, signed and submitted: issued, with its fiscal number and security code, and not yet registered by the authority. accepted: registered; registrationCode is set. deferred: the authority could not be reached, and the document is sent again with its reason code. rejected: the authority refused it; it is corrected, never resent. repudiated: refused by the authority's later check after it was accepted. settled: accepted and through that later check. superseded: a corrective replaced it. draft: stored, not yet numbered. accepted is not settled.",
+            "enum": [
+              "draft",
+              "numbered",
+              "signed",
+              "submitted",
+              "accepted",
+              "rejected",
+              "deferred",
+              "repudiated",
+              "settled",
+              "superseded"
+            ],
             "type": "string"
           },
           "tenantMustAct": {
@@ -1757,6 +1993,15 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
             ]
           }
         },
@@ -1802,6 +2047,19 @@
             ]
           },
           "state": {
+            "description": "Where the document is. numbered, signed and submitted: issued, with its fiscal number and security code, and not yet registered by the authority. accepted: registered; registrationCode is set. deferred: the authority could not be reached, and the document is sent again with its reason code. rejected: the authority refused it; it is corrected, never resent. repudiated: refused by the authority's later check after it was accepted. settled: accepted and through that later check. superseded: a corrective replaced it. draft: stored, not yet numbered. accepted is not settled.",
+            "enum": [
+              "draft",
+              "numbered",
+              "signed",
+              "submitted",
+              "accepted",
+              "rejected",
+              "deferred",
+              "repudiated",
+              "settled",
+              "superseded"
+            ],
             "type": "string"
           },
           "tenantMustAct": {
@@ -1899,6 +2157,19 @@
             ]
           },
           "state": {
+            "description": "Where the document is. numbered, signed and submitted: issued, with its fiscal number and security code, and not yet registered by the authority. accepted: registered; registrationCode is set. deferred: the authority could not be reached, and the document is sent again with its reason code. rejected: the authority refused it; it is corrected, never resent. repudiated: refused by the authority's later check after it was accepted. settled: accepted and through that later check. superseded: a corrective replaced it. draft: stored, not yet numbered. accepted is not settled.",
+            "enum": [
+              "draft",
+              "numbered",
+              "signed",
+              "submitted",
+              "accepted",
+              "rejected",
+              "deferred",
+              "repudiated",
+              "settled",
+              "superseded"
+            ],
             "type": "string"
           },
           "verificationUrl": {
@@ -2524,6 +2795,340 @@
         ],
         "type": "object"
       },
+      "MissingReasonResponse": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/MissingReasonRowResponse"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "documents",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "MissingReasonRowResponse": {
+        "properties": {
+          "deadlines": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonDeadlineResponse"
+            },
+            "type": "array"
+          },
+          "documentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fiscalNumber": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "minutesLeft": {
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "taxId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "taxId",
+          "documentId",
+          "fiscalNumber",
+          "issuedAt",
+          "limit",
+          "minutesLeft",
+          "deadlines"
+        ],
+        "type": "object"
+      },
+      "NoCoverageListResponse": {
+        "properties": {
+          "confirmations": {
+            "items": {
+              "$ref": "#/components/schemas/NoCoverageResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "confirmations"
+        ],
+        "type": "object"
+      },
+      "NoCoverageRequest": {
+        "properties": {
+          "businessUnitCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "validFrom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "validUntil": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "NoCoverageResponse": {
+        "properties": {
+          "businessUnitCode": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "businessUnitCode",
+          "validFrom",
+          "validUntil",
+          "reference",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "type": "object"
+      },
+      "NumberingActBody": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "number": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "date"
+        ],
+        "type": "object"
+      },
+      "NumberingActFileRequest": {
+        "properties": {
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fileName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "fileName",
+          "content"
+        ],
+        "type": "object"
+      },
+      "NumberingActFileResponse": {
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "sha256",
+          "uploadedAt"
+        ],
+        "type": "object"
+      },
+      "OfflineNoticeListResponse": {
+        "properties": {
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/OfflineNoticeResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "notices"
+        ],
+        "type": "object"
+      },
+      "OfflineNoticeRequest": {
+        "properties": {
+          "businessUnitCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disconnectedAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "documentId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filedOn": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reconnectedAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OfflineNoticeResponse": {
+        "properties": {
+          "businessUnitCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disconnectedAt": {
+            "type": "string"
+          },
+          "documentId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filedBy": {
+            "type": "string"
+          },
+          "filedOn": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reconnectedAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "businessUnitCode",
+          "documentId",
+          "disconnectedAt",
+          "reconnectedAt",
+          "filedOn",
+          "filedBy",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "type": "object"
+      },
       "OutstandingDocument": {
         "properties": {
           "currency": {
@@ -2659,6 +3264,63 @@
         ],
         "type": "object"
       },
+      "PartnerContactBody": {
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "phone"
+        ],
+        "type": "object"
+      },
+      "PartnerContactsRequest": {
+        "properties": {
+          "billing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PartnerContactBody"
+              }
+            ]
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PartnerContactBody"
+              }
+            ]
+          }
+        },
+        "required": [
+          "contact",
+          "billing"
+        ],
+        "type": "object"
+      },
       "PartnerLimitsRequest": {
         "properties": {
           "monthlyDocumentQuota": {
@@ -2699,12 +3361,32 @@
       },
       "PartnerResponse": {
         "properties": {
+          "billing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PartnerContactBody"
+              }
+            ]
+          },
           "businesses": {
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "integer",
               "string"
+            ]
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PartnerContactBody"
+              }
             ]
           },
           "createdAt": {
@@ -2770,6 +3452,12 @@
               "string"
             ]
           },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "name": {
             "type": [
               "null",
@@ -2824,6 +3512,34 @@
           "address",
           "town",
           "countryCode"
+        ],
+        "type": "object"
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "code",
+          "newPassword"
         ],
         "type": "object"
       },
@@ -3162,13 +3878,59 @@
           "name": {
             "type": "string"
           },
+          "role": {
+            "type": "string"
+          },
           "tenantId": {
             "type": "string"
           }
         },
         "required": [
           "tenantId",
-          "name"
+          "name",
+          "role"
+        ],
+        "type": "object"
+      },
+      "PersonEventListResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PersonEventResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "type": "object"
+      },
+      "PersonEventResponse": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "verb": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "verb",
+          "summary"
         ],
         "type": "object"
       },
@@ -3292,6 +4054,12 @@
       },
       "Pkcs12UploadRequest": {
         "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "currentPassword": {
             "type": [
               "null",
@@ -3571,6 +4339,85 @@
         ],
         "type": "object"
       },
+      "PrintHealth": {
+        "properties": {
+          "awaitingUpload": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "parked": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "parked",
+          "awaitingUpload"
+        ],
+        "type": "object"
+      },
+      "PrintSourceRequest": {
+        "properties": {
+          "printSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "printSource"
+        ],
+        "type": "object"
+      },
+      "PrintSourceResponse": {
+        "properties": {
+          "printSource": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "printSource"
+        ],
+        "type": "object"
+      },
+      "PrintUploadResponse": {
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256",
+          "sizeBytes",
+          "uploadedAt"
+        ],
+        "type": "object"
+      },
       "ProfileEnumeration": {
         "properties": {
           "field": {
@@ -3844,6 +4691,71 @@
         ],
         "type": "object"
       },
+      "ReasonDeadlineResponse": {
+        "properties": {
+          "admittedUntil": {
+            "type": "string"
+          },
+          "anchorUnconfirmed": {
+            "type": "boolean"
+          },
+          "case": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "minutesLeft": {
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "pendingConfirmation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "statutoryDeadline": {
+            "type": "string"
+          },
+          "warningAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "reasonCode",
+          "statutoryDeadline",
+          "minutesLeft",
+          "admittedUntil",
+          "source",
+          "anchorUnconfirmed"
+        ],
+        "type": "object"
+      },
+      "ReconnectionRequest": {
+        "properties": {
+          "reconnectedAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "RecordHealth": {
         "properties": {
           "cashDepositsRefused": {
@@ -3931,6 +4843,22 @@
           "operators",
           "software",
           "devices"
+        ],
+        "type": "object"
+      },
+      "ResetCodeResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt"
         ],
         "type": "object"
       },
@@ -4171,6 +5099,21 @@
       },
       "SessionTenantResponse": {
         "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "taxId": {
             "type": "string"
           },
@@ -4525,6 +5468,12 @@
             "type": [
               "null",
               "array"
+            ]
+          },
+          "projectReference": {
+            "type": [
+              "null",
+              "string"
             ]
           },
           "reverseCharge": {
@@ -4993,6 +5942,9 @@
               "string"
             ]
           },
+          "printing": {
+            "$ref": "#/components/schemas/PrintHealth"
+          },
           "queue": {
             "$ref": "#/components/schemas/QueueHealth"
           },
@@ -5025,7 +5977,8 @@
           "lastRegisteredAt",
           "checkedAt",
           "devicesWithoutOpeningFloat",
-          "records"
+          "records",
+          "printing"
         ],
         "type": "object"
       },
@@ -5381,6 +6334,111 @@
         ],
         "type": "object"
       },
+      "TwoFactorChallengeResponse": {
+        "properties": {
+          "challenge": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "TwoFactorCodeRequest": {
+        "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "TwoFactorRemoveRequest": {
+        "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currentPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "currentPassword",
+          "code"
+        ],
+        "type": "object"
+      },
+      "TwoFactorSetupResponse": {
+        "properties": {
+          "link": {
+            "type": "string"
+          },
+          "qrSvg": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "link",
+          "qrSvg"
+        ],
+        "type": "object"
+      },
+      "TwoFactorSignInRequest": {
+        "properties": {
+          "challenge": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "challenge",
+          "code"
+        ],
+        "type": "object"
+      },
+      "TwoFactorStartRequest": {
+        "properties": {
+          "currentPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "currentPassword"
+        ],
+        "type": "object"
+      },
       "UploadLinkCertificateRequest": {
         "properties": {
           "passphrase": {
@@ -5691,6 +6749,493 @@
         },
         "tags": [
           "Efis.Api"
+        ]
+      }
+    },
+    "/v1/account": {
+      "get": {
+        "operationId": "ReadAccount",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/events": {
+      "get": {
+        "operationId": "ListAccountEvents",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonEventListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/password": {
+      "post": {
+        "operationId": "ChangeAccountPassword",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ChangePasswordRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/sessions": {
+      "get": {
+        "operationId": "ListAccountSessions",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSessionListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/sessions/{sessionId}/end": {
+      "post": {
+        "operationId": "EndAccountSession",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/two-factor": {
+      "post": {
+        "operationId": "StartTwoFactor",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TwoFactorStartRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetupResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/two-factor/confirm": {
+      "post": {
+        "operationId": "ConfirmTwoFactor",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TwoFactorCodeRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/account/two-factor/remove": {
+      "post": {
+        "operationId": "RemoveTwoFactor",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TwoFactorRemoveRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "tags": [
+          "Account"
         ]
       }
     },
@@ -7317,6 +8862,74 @@
         ]
       }
     },
+    "/v1/admin/people/{userId}/events": {
+      "get": {
+        "operationId": "AdminListPersonEvents",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonEventListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
     "/v1/admin/people/{userId}/platform-role": {
       "post": {
         "operationId": "AdminSetPlatformRole",
@@ -7414,6 +9027,155 @@
               }
             },
             "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/people/{userId}/reset-code": {
+      "post": {
+        "operationId": "AdminIssueResetCode",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetCodeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/people/{userId}/two-factor/reset": {
+      "post": {
+        "operationId": "AdminResetTwoFactor",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "tags": [
@@ -7524,6 +9286,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QueueResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/queue/missing-reason": {
+      "get": {
+        "description": "Documents the worker parked because a resend must declare a reason code and the recorded answer supports none (DEV-1806). Nothing sends them until a person declares the cause (POST /v1/documents/{id}/reason-code). Most urgent first. Each row gives, for every cause that could be declared, the statutory deadline and the time left on it, the authority's acceptance limit, the calendar source, and whether the clock's start is still unconfirmed (legal-decisions O2).",
+        "operationId": "AdminQueueMissingReason",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissingReasonResponse"
                 }
               }
             },
@@ -7974,6 +9786,636 @@
         ]
       }
     },
+    "/v1/business/people": {
+      "get": {
+        "operationId": "BusinessListPeople",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Business people"
+        ]
+      },
+      "post": {
+        "operationId": "BusinessAddPerson",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InvitePersonRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business people"
+        ]
+      }
+    },
+    "/v1/business/people/{userId}/reset-code": {
+      "post": {
+        "operationId": "BusinessIssueResetCode",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetCodeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Business people"
+        ]
+      }
+    },
+    "/v1/business/people/{userId}/role": {
+      "post": {
+        "operationId": "BusinessSetPersonRole",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetRoleRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business people"
+        ]
+      }
+    },
+    "/v1/business/profile": {
+      "get": {
+        "operationId": "ReadBusinessProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessProfileResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      },
+      "put": {
+        "operationId": "SetBusinessProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BusinessProfileRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessProfileResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      }
+    },
+    "/v1/business/profile/numbering-act-file": {
+      "get": {
+        "operationId": "ReadNumberingActFile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      },
+      "post": {
+        "operationId": "KeepNumberingActFile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NumberingActFileRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberingActFileResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      }
+    },
     "/v1/business/support-access": {
       "get": {
         "operationId": "ListBusinessSupportAccess",
@@ -8023,6 +10465,74 @@
               }
             },
             "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      }
+    },
+    "/v1/business/support-access/{grantId}/end": {
+      "post": {
+        "operationId": "EndBusinessSupportAccess",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "grantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         },
         "tags": [
@@ -9222,7 +11732,7 @@
         ]
       },
       "post": {
-        "description": "Rate limited per taxpayer: a budget of submissions per minute (Efis:RateLimits:DocumentWritesPerMinute, 600 unless the deployment says otherwise), per caller of a taxpayer; a batch costs one per document and is refused whole when it does not fit. Every answer carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; a refusal is 429 rate_limited with Retry-After, and spends no number.",
+        "description": "Issues the document. 202 means it is issued (state numbered, with its fiscal number and security code) and not yet registered by the authority: registrationCode is null. Registration follows without another call. The result arrives as a webhook (document.fiscalised, document.deferred or document.rejected), and GET /v1/documents/{id} shows it in state at any time; GET /v1/documents/{id}/steps shows a step that waits for a person. A send the authority could not receive is retried by efis, and one it refused is never resent; there is no resend call. Rate limited per taxpayer: a budget of submissions per minute (Efis:RateLimits:DocumentWritesPerMinute, 600 unless the deployment says otherwise), per caller of a taxpayer; a batch costs one per document and is refused whole when it does not fit. Every answer carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset; a refusal is 429 rate_limited with Retry-After, and spends no number.",
         "operationId": "SubmitDocument",
         "parameters": [
           {
@@ -9649,7 +12159,7 @@
     },
     "/v1/documents/{id}/pdf": {
       "get": {
-        "description": "The invoice as printed for the customer, in the order and wording Instruction 16/2020 Art. 9 sets.",
+        "description": "The invoice as printed for the customer, in the order and wording Instruction 16/2020 Art. 9 sets. Once the authority has accepted the document and its printout is stored, these are the stored bytes, the same every time, and never a fresh render; before then it is rendered on request.",
         "operationId": "PrintDocument",
         "parameters": [
           {
@@ -9726,6 +12236,163 @@
               }
             },
             "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      },
+      "post": {
+        "description": "The business's own invoice PDF (base64 in pdf) for step 50 to stamp and keep: the verification QR of Instruction 16/2020 Art. 12 and the codes of Art. 9, appended as an incremental update. It is checked against the stamp before it is kept, so a PDF that cannot be stamped is refused with 422 and a named reason. A later upload replaces an earlier one until step 50 runs; after that the stored invoice is final (409). The ceiling is 2 MB.",
+        "operationId": "UploadDocumentPdf",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StampPdfRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintUploadResponse"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Payload Too Large"
           },
           "422": {
             "content": {
@@ -9858,6 +12525,125 @@
               }
             },
             "description": "Payload Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}/reason-code": {
+      "post": {
+        "description": "Declares why a document the worker parked for a missing reason code is late, and sends it again. Only a person may declare it (X-Session; a machine credential is refused): the code is the taxpayer's statement to the authority and must match the real cause. Who chose it and why are kept on the document's record. A document that is not parked for a missing reason (409 not_parked_for_missing_reason) or already has a declared cause (409 reason_already_declared) is refused.",
+        "operationId": "DeclareDocumentReasonCode",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DeclareReasonRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentStepsResponse"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -11086,6 +13872,26 @@
               }
             },
             "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "tags": [
@@ -11142,6 +13948,26 @@
               }
             },
             "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "tags": [
@@ -11321,6 +14147,427 @@
         },
         "tags": [
           "Exports"
+        ]
+      }
+    },
+    "/v1/no-coverage-confirmations": {
+      "get": {
+        "operationId": "ListNoCoverageConfirmations",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCoverageListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Deadlines"
+        ]
+      },
+      "post": {
+        "description": "Records the authority's confirmation that a premise has no coverage, for the dates it states: one year at most (UdhÃ«zim 16 Art. 34(5)). A NOINTERNET document of that premise issued inside the dates is due by the end of the 10th of the month after its issue (Art. 34(11)). Only a person may record it (X-Session).",
+        "operationId": "RecordNoCoverageConfirmation",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NoCoverageRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCoverageResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Deadlines"
+        ]
+      }
+    },
+    "/v1/offline-notices": {
+      "get": {
+        "operationId": "ListOfflineNotices",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineNoticeListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Deadlines"
+        ]
+      },
+      "post": {
+        "description": "Records a Shtojca 4 notice: the connection was lost and not restored within 48 hours. For one premise (businessUnitCode) or one document (documentId). A NOINTERNET document it covers is then due by the end of the 10th of the month after the drop, instead of 48 hours from it. Only a person may record it (X-Session). A working assumption pending the authority's confirmation (DEV-2036).",
+        "operationId": "RecordOfflineNotice",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OfflineNoticeRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineNoticeResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Deadlines"
+        ]
+      }
+    },
+    "/v1/offline-notices/{id}/reconnection": {
+      "post": {
+        "description": "Records when the link a notice reports came back. Recorded once (409 reconnection_already_recorded). A premise's documents issued after it are no longer covered by the notice.",
+        "operationId": "RecordOfflineNoticeReconnection",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReconnectionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineNoticeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Deadlines"
         ]
       }
     },
@@ -12323,6 +15570,88 @@
         ]
       }
     },
+    "/v1/partner/contacts": {
+      "post": {
+        "operationId": "PartnerSetContacts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Partner-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PartnerContactsRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Partner"
+        ]
+      }
+    },
     "/v1/partner/people": {
       "get": {
         "operationId": "PartnerListPeople",
@@ -12469,6 +15798,91 @@
         ]
       }
     },
+    "/v1/partner/people/{userId}/reset-code": {
+      "post": {
+        "operationId": "PartnerIssueResetCode",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Partner-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetCodeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Partner"
+        ]
+      }
+    },
     "/v1/partner/people/{userId}/role": {
       "post": {
         "operationId": "PartnerSetStaffRole",
@@ -12573,6 +15987,84 @@
               }
             },
             "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Partner"
+        ]
+      }
+    },
+    "/v1/partner/people/{userId}/two-factor/reset": {
+      "post": {
+        "operationId": "PartnerResetTwoFactor",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Partner-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "tags": [
@@ -13000,6 +16492,55 @@
         },
         "tags": [
           "Partner"
+        ]
+      }
+    },
+    "/v1/password-resets": {
+      "post": {
+        "operationId": "RedeemResetCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PasswordResetRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "tags": [
+          "Account"
         ]
       }
     },
@@ -13611,6 +17152,15 @@
     "/v1/sessions": {
       "post": {
         "operationId": "OpenSession",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13637,6 +17187,16 @@
               }
             },
             "description": "OK"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorChallengeResponse"
+                }
+              }
+            },
+            "description": "Accepted"
           },
           "401": {
             "content": {
@@ -13728,6 +17288,82 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        },
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/v1/sessions/two-factor": {
+      "post": {
+        "operationId": "OpenSessionWithTwoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TwoFactorSignInRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "tags": [
@@ -14312,6 +17948,160 @@
               }
             },
             "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/v1/tenants/{id}/print-source": {
+      "get": {
+        "description": "Whether efis renders this business's printed invoices (efis) or stamps the PDF the business uploads for each one (customer). A business that never chose prints with efis.",
+        "operationId": "GetTenantPrintSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSourceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Tenants"
+        ]
+      },
+      "put": {
+        "description": "Chooses where the printed invoice step 50 keeps comes from: efis renders it, or efis stamps the PDF the business uploads at POST /v1/documents/{id}/pdf. It applies to every accepted document whose printed invoice is not yet stored. With customer, a document waits for its upload; nothing is printed in its place.",
+        "operationId": "SetTenantPrintSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PrintSourceRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSourceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "tags": [
@@ -15093,6 +18883,12 @@
       "name": "Documents"
     },
     {
+      "name": "Tenants"
+    },
+    {
+      "name": "Deadlines"
+    },
+    {
       "name": "Certificates"
     },
     {
@@ -15102,6 +18898,21 @@
       "name": "Sessions"
     },
     {
+      "name": "Admin"
+    },
+    {
+      "name": "Partner"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Business people"
+    },
+    {
+      "name": "Business profile"
+    },
+    {
       "name": "Registry"
     },
     {
@@ -15109,9 +18920,6 @@
     },
     {
       "name": "Taxpayers"
-    },
-    {
-      "name": "Tenants"
     },
     {
       "name": "Status"
@@ -15129,13 +18937,7 @@
       "name": "Webhooks"
     },
     {
-      "name": "Partner"
-    },
-    {
       "name": "Exports"
-    },
-    {
-      "name": "Admin"
     },
     {
       "name": "CashDeposits"

@@ -61,6 +61,25 @@ class MoneyTests(unittest.TestCase):
         self.assertEqual(money.format_plain(Decimal("0.50")), "0.5")
 
 
+class BuyerKindTests(unittest.TestCase):
+    def buyer(self, **overrides):
+        buyer = dict(support.invoice()["buyer"])
+        buyer.update(overrides)
+        return support.invoice(buyer=buyer)
+
+    def test_a_company_is_sent_as_a_business(self):
+        body = build(self.buyer(kind="business", identifier=None), support.config(), support.profile())
+        self.assertEqual(body["buyer"]["kind"], "business")
+
+    def test_a_person_is_left_to_efis_default(self):
+        body = build(self.buyer(kind=None), support.config(), support.profile())
+        self.assertNotIn("kind", body["buyer"])
+
+    def test_an_unknown_kind_is_refused(self):
+        with self.assertRaises(PayloadInvalid):
+            build(self.buyer(kind="individual"), support.config(), support.profile())
+
+
 class PayloadTests(unittest.TestCase):
     def test_a_posted_invoice_becomes_efis_request(self):
         body = build(support.invoice(), support.config(), support.profile())

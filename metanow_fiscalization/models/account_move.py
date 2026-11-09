@@ -50,6 +50,10 @@ class AccountMove(models.Model):
     metanow_fiscal_idempotency_key = fields.Char(copy=False, readonly=True)
     metanow_fiscal_attempt = fields.Integer(copy=False, readonly=True, default=0)
     metanow_fiscal_error = fields.Text(string="Përgjigja e efis / efis's answer", copy=False, readonly=True)
+    metanow_fiscal_warnings = fields.Text(
+        string="Paralajmërimet e efis / efis's warnings", copy=False, readonly=True,
+        help="Dokumenti është lëshuar; efis tregon diçka për t'u parë. "
+             "/ The document is issued; efis points out something to look at.")
     metanow_fiscal_qr_src = fields.Char(compute="_compute_metanow_fiscal_qr_src")
 
     @api.depends("metanow_fiscal_verification_url")
@@ -109,6 +113,7 @@ class AccountMove(models.Model):
         if partner:
             buyer = {
                 "name": partner.name,
+                "kind": efis_payload.BUSINESS if partner.is_company else None,
                 "identifier": partner.vat,
                 "identifier_type": partner.metanow_fiscal_identifier_type,
                 "address": " ".join(part for part in (partner.street, partner.street2) if part) or None,
@@ -165,7 +170,7 @@ class AccountMove(models.Model):
         names = (
             outcome.DOCUMENT_ID, outcome.STATE, outcome.EFIS_STATE, outcome.FISCAL_NUMBER,
             outcome.SECURITY_CODE, outcome.REGISTRATION_CODE, outcome.VERIFICATION_URL,
-            outcome.ISSUED_AT, outcome.ERROR,
+            outcome.ISSUED_AT, outcome.ERROR, outcome.WARNINGS,
         )
         return {name: self[name] or None for name in names}
 

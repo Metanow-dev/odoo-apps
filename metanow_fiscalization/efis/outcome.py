@@ -27,7 +27,11 @@ POLLED = (SENT, DEFERRED)
 # A refused document was never numbered by efis, so the invoice may go back to draft.
 RESETTABLE = (REFUSED,)
 
+# Every value of DocumentResponse.state in the OpenAPI copy is mapped here on purpose; a test
+# checks that against contract/efis-openapi-v1.json. "draft" is stored in efis and not yet
+# numbered: it is still efis's to finish, so it is read again like a sent document.
 _EFIS_STATES = {
+    "draft": SENT,
     "numbered": SENT,
     "signed": SENT,
     "submitted": SENT,
@@ -38,6 +42,7 @@ _EFIS_STATES = {
     "repudiated": REJECTED,
     "superseded": SUPERSEDED,
 }
+KNOWN_EFIS_STATES = frozenset(_EFIS_STATES)
 
 DOCUMENT_ID = "metanow_fiscal_document_id"
 STATE = "metanow_fiscal_state"
@@ -48,6 +53,7 @@ REGISTRATION_CODE = "metanow_fiscal_registration_code"
 VERIFICATION_URL = "metanow_fiscal_verification_url"
 ISSUED_AT = "metanow_fiscal_issued_at"
 ERROR = "metanow_fiscal_error"
+WARNINGS = "metanow_fiscal_warnings"
 
 # Fields that, once they hold a value, never change.
 WRITE_ONCE = (DOCUMENT_ID, FISCAL_NUMBER, SECURITY_CODE, REGISTRATION_CODE, ISSUED_AT)
@@ -95,6 +101,11 @@ def document_values(current, document):
             continue
         if stored != incoming:
             values[field] = incoming
+    # DocumentDetailResponse.warnings: present on a read, absent from the submission answer.
+    # Only a body that carries the list replaces what is stored.
+    if "warnings" in document:
+        warnings = [str(item) for item in (document.get("warnings") or []) if item not in (None, "")]
+        values[WARNINGS] = "\n".join(warnings) or False
     efis_state = str(document.get("state") or "")
     values[EFIS_STATE] = efis_state
     values[STATE] = odoo_state(efis_state)

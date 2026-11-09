@@ -29,6 +29,7 @@
                             <field name="metanow_fiscal_document_id"/>
                         </group>
                     </group>
+                    <field name="metanow_fiscal_warnings" invisible="not metanow_fiscal_warnings"/>
                     <field name="metanow_fiscal_error" invisible="not metanow_fiscal_error"/>
                 </page>
             </xpath>

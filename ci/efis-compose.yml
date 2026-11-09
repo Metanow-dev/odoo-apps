@@ -76,6 +76,12 @@ services:
       # (openssl rand -base64 32). Optional: empty means the webhook routes answer 503 and
       # nothing is sent. Changing it changes every endpoint's secret at once.
       Efis__Webhooks__Key: "${EFIS_WEBHOOKS_KEY:-}"
+      # Two-factor sign-in (DEV-2171). Seals each person's authenticator secret (AES-256-GCM);
+      # at least 32 characters, generated (openssl rand -base64 32). Optional: empty means
+      # nobody can turn two-factor on. Keep it with the database backups' secrets: if it is
+      # lost or changed, everyone who turned two-factor on cannot sign in until an admin turns
+      # it off for them -- and an admin who turned it on is locked out the same way.
+      Efis__Accounts__TwoFactorKey: "${EFIS_TWO_FACTOR_KEY:-}"
       # Document submissions per taxpayer per minute, per api replica. Empty means 600; 0 turns
       # the limit off.
       Efis__RateLimits__DocumentWritesPerMinute: "${EFIS_RATE_LIMIT_PER_MINUTE:-}"
