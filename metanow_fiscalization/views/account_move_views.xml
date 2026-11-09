@@ -38,6 +38,13 @@
                             <field name="metanow_fiscal_document_id"/>
                         </group>
                     </group>
+                    <group name="metanow_fiscal_einvoice" string="Fatura elektronike / E-invoice"
+                           invisible="not metanow_fiscal_electronic">
+                        <field name="metanow_fiscal_electronic"/>
+                        <field name="metanow_fiscal_einvoice_state"/>
+                        <field name="metanow_fiscal_einvoice_eic"/>
+                        <field name="metanow_fiscal_einvoice_error" invisible="not metanow_fiscal_einvoice_error"/>
+                    </group>
                     <field name="metanow_fiscal_warnings" invisible="not metanow_fiscal_warnings"/>
                     <field name="metanow_fiscal_error" invisible="not metanow_fiscal_error"/>
                 </page>
@@ -53,7 +60,7 @@
             <xpath expr="//search" position="inside">
                 <filter name="metanow_fiscal_attention"
                         string="Fiskalizimi kërkon veprim / Fiscalisation needs action"
-                        domain="[('metanow_fiscal_state', 'in', ('parked', 'refused', 'rejected'))]"/>
+                        domain="['|', ('metanow_fiscal_state', 'in', ('parked', 'refused', 'rejected')), ('metanow_fiscal_einvoice_state', '=', 'refused')]"/>
                 <filter name="metanow_fiscal_pending"
                         string="Në pritje të efis / Waiting for efis"
                         domain="[('metanow_fiscal_state', 'in', ('to_send', 'sent', 'deferred'))]"/>

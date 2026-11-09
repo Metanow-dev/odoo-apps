@@ -122,6 +122,57 @@ class EfisStateTests(unittest.TestCase):
         self.assertNotIn(outcome.SECURITY_CODE, values)
 
 
+EIC = "5e1a0c3d-0000-4000-8000-00000000e1c0"
+
+
+def einvoice(state="registered", eic=EIC, fault_text=None):
+    return {
+        "id": "a1b2c3d4-0000-4000-8000-000000000001",
+        "documentId": support.document_response()["id"],
+        "kind": "invoice", "state": state, "eic": eic, "faultCode": None, "faultText": fault_text,
+        "warnings": [], "reconciled": False, "authorityStatus": None, "statusSeenAt": None,
+        "createdAt": "2026-11-09T10:00:00+01:00", "answeredAt": None,
+    }
+
+
+class EinvoiceTests(unittest.TestCase):
+    def test_not_built_yet_is_nothing_to_store(self):
+        self.assertIsNone(outcome.einvoice_values(EMPTY, error(404, "not_found")))
+        self.assertIsNone(outcome.einvoice_values(EMPTY, None))
+
+    def test_a_registered_e_invoice_stores_its_state_and_eic(self):
+        values = outcome.einvoice_values(EMPTY, Response(200, einvoice()))
+        self.assertEqual(values, {outcome.EINVOICE_STATE: "registered", outcome.EINVOICE_EIC: EIC})
+
+    def test_a_refused_e_invoice_stores_efis_sentence(self):
+        values = outcome.einvoice_values(EMPTY, Response(200, einvoice("refused", None, "The buyer is not registered.")))
+        self.assertEqual(values[outcome.EINVOICE_STATE], "refused")
+        self.assertEqual(values[outcome.EINVOICE_ERROR], "The buyer is not registered.")
+        self.assertNotIn(outcome.EINVOICE_EIC, values)
+
+    def test_a_stored_eic_is_never_replaced(self):
+        current = {outcome.EINVOICE_EIC: EIC}
+        with self.assertRaises(outcome.SecurityCodeConflict):
+            outcome.einvoice_values(current, Response(200, einvoice(eic="5e1a0c3d-0000-4000-8000-0000000000ff")))
+
+    def test_an_unchanged_answer_is_nothing_to_store(self):
+        current = {outcome.EINVOICE_STATE: "registered", outcome.EINVOICE_EIC: EIC}
+        self.assertIsNone(outcome.einvoice_values(current, Response(200, einvoice())))
+
+    def test_pending_until_registered_or_refused(self):
+        for state in (None, "queued", "sending", "unanswered"):
+            self.assertTrue(outcome.einvoice_pending({outcome.ELECTRONIC: True, outcome.EINVOICE_STATE: state}), state)
+        for state in ("registered", "refused"):
+            self.assertFalse(outcome.einvoice_pending({outcome.ELECTRONIC: True, outcome.EINVOICE_STATE: state}))
+        self.assertFalse(outcome.einvoice_pending({outcome.ELECTRONIC: False}))
+
+    def test_the_e_invoice_states_are_efis_published_ones(self):
+        properties = support.openapi()["components"]["schemas"]["EinvoiceOutboundView"]["properties"]
+        self.assertIn("state", properties)
+        self.assertIn("eic", properties)
+        self.assertIn("faultText", properties)
+
+
 class WarningTests(unittest.TestCase):
     def stored(self):
         current = outcome.document_values(EMPTY, support.document_response())

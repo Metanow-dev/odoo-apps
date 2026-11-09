@@ -54,9 +54,18 @@ VERIFICATION_URL = "metanow_fiscal_verification_url"
 ISSUED_AT = "metanow_fiscal_issued_at"
 ERROR = "metanow_fiscal_error"
 WARNINGS = "metanow_fiscal_warnings"
+ELECTRONIC = "metanow_fiscal_electronic"
+EINVOICE_STATE = "metanow_fiscal_einvoice_state"
+EINVOICE_EIC = "metanow_fiscal_einvoice_eic"
+EINVOICE_ERROR = "metanow_fiscal_einvoice_error"
+
+# EinvoiceOutboundView.state values after which efis does nothing more with the e-invoice:
+# the authority returned its EIC, or refused the request (a client fault). "queued", "sending"
+# and "unanswered" (no trusted answer yet, reconciled by efis) are read again.
+EINVOICE_FINAL = ("registered", "refused")
 
 # Fields that, once they hold a value, never change.
-WRITE_ONCE = (DOCUMENT_ID, FISCAL_NUMBER, SECURITY_CODE, REGISTRATION_CODE, ISSUED_AT)
+WRITE_ONCE = (DOCUMENT_ID, FISCAL_NUMBER, SECURITY_CODE, REGISTRATION_CODE, ISSUED_AT, EINVOICE_EIC)
 
 # efis's DocumentResponse / DocumentDetailResponse property -> Odoo field.
 _RESPONSE_FIELDS = (
@@ -174,3 +183,38 @@ def poll_values(current, response):
         return None
     # Write the whole set when anything changed, so the record never holds half an answer.
     return values
+
+
+def einvoice_values(current, response):
+    """Values for GET /v1/documents/{id}/einvoice, or None when there is nothing new to store.
+
+    404 means efis has not built the e-invoice yet: it is exchanged only after fiscalisation.
+    An EIC, once stored, is never replaced.
+    """
+    if response is None or response.status != 200 or not isinstance(response.body, dict):
+        return None
+    body = response.body
+    values = {}
+    state = str(body.get("state") or "")
+    if state:
+        values[EINVOICE_STATE] = state
+    eic = body.get("eic")
+    stored = current.get(EINVOICE_EIC) or None
+    if eic:
+        eic = str(eic)
+        if stored is not None and stored != eic:
+            raise SecurityCodeConflict(
+                f"{EINVOICE_EIC}: stored {stored!r}, efis answered {eic!r}; the stored value is kept")
+        if stored is None:
+            values[EINVOICE_EIC] = eic
+    # Only efis's sentence is read. The authority's numeric code beside it stays in efis: its
+    # name is the authority's vocabulary, which this module does not carry.
+    fault = str(body.get("faultText") or "").strip()
+    values[EINVOICE_ERROR] = fault or False
+    changed = {key: value for key, value in values.items() if (current.get(key) or False) != value}
+    return changed or None
+
+
+def einvoice_pending(values):
+    """Whether an invoice sent as an e-invoice still waits for efis to finish exchanging it."""
+    return bool(values.get(ELECTRONIC)) and values.get(EINVOICE_STATE) not in EINVOICE_FINAL

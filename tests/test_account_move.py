@@ -12,7 +12,7 @@ from metanow_fiscalization.models.res_company import ResCompany
 
 FISCAL_FIELDS = {
     outcome.DOCUMENT_ID, outcome.STATE, outcome.EFIS_STATE, outcome.FISCAL_NUMBER,
-    outcome.SECURITY_CODE, outcome.VERIFICATION_URL, outcome.ERROR,
+    outcome.SECURITY_CODE, outcome.VERIFICATION_URL, outcome.ERROR, outcome.ELECTRONIC,
 }
 
 
@@ -270,6 +270,71 @@ class SendTests(unittest.TestCase):
         self.assertEqual(record.metanow_fiscal_state, outcome.REGISTERED)
         self.assertEqual(record.metanow_fiscal_registration_code, "d9b0b4a1-0000-4000-8000-000000000001")
         self.assertIn("barLevel=M", _qr(record))
+
+
+class EinvoiceSendTests(unittest.TestCase):
+    EIC = "5e1a0c3d-0000-4000-8000-00000000e1c0"
+
+    def sent(self, *answers):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()), *answers)
+        record = move(env, company(env, opener=opener, metanow_fiscal_einvoice=True))
+        record._post()
+        record._metanow_fiscal_send()
+        record.writes.clear()
+        return record, opener
+
+    def test_an_e_invoice_is_flagged_in_the_request_and_on_the_invoice(self):
+        record, opener = self.sent()
+        self.assertIs(opener.requests[0]["body"]["electronic"], True)
+        self.assertIs(record.metanow_fiscal_electronic, True)
+
+    def test_off_in_the_company_sends_a_plain_fiscal_invoice(self):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        record = move(env, company(env, opener=opener, metanow_fiscal_einvoice=False))
+        record._post()
+        record._metanow_fiscal_send()
+        self.assertNotIn("electronic", opener.requests[0]["body"])
+        self.assertIs(record.metanow_fiscal_electronic, False)
+
+    def test_the_e_invoice_is_read_once_registered_in_the_same_write(self):
+        registered = support.document_response(state="accepted", registrationCode="d9b0b4a1-0000-4000-8000-000000000001")
+        answer = {"id": "a1", "documentId": registered["id"], "kind": "invoice", "state": "registered",
+                  "eic": self.EIC, "faultCode": None, "faultText": None, "warnings": [], "reconciled": False,
+                  "authorityStatus": None, "statusSeenAt": None, "createdAt": "2026-11-09T10:00:00+01:00",
+                  "answeredAt": None}
+        record, opener = self.sent((200, registered), (200, answer))
+        record._metanow_fiscal_poll()
+        self.assertTrue(opener.requests[2]["url"].endswith(f"/v1/documents/{registered['id']}/einvoice"))
+        self.assertEqual(len(record.writes), 1, "the document and its e-invoice are one write")
+        self.assertEqual(record.metanow_fiscal_state, outcome.REGISTERED)
+        self.assertEqual(record.metanow_fiscal_einvoice_state, "registered")
+        self.assertEqual(record.metanow_fiscal_einvoice_eic, self.EIC)
+
+    def test_the_e_invoice_is_not_read_before_registration(self):
+        record, opener = self.sent((200, support.document_response(state="submitted")))
+        record._metanow_fiscal_poll()
+        self.assertEqual(len(opener.requests), 2)
+
+    def test_an_e_invoice_not_built_yet_keeps_the_document_answer(self):
+        registered = support.document_response(state="accepted", registrationCode="d9b0b4a1-0000-4000-8000-000000000001")
+        record, _ = self.sent((200, registered), (404, {"code": "not_found", "retryable": False, "authorityCode": None}))
+        record._metanow_fiscal_poll()
+        self.assertEqual(record.metanow_fiscal_state, outcome.REGISTERED)
+        self.assertIs(record.metanow_fiscal_einvoice_state, False)
+        self.assertEqual(record.env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_poll"].count > 0, True,
+                         "it is read again until the e-invoice is exchanged")
+
+    def test_the_poll_job_reads_pending_e_invoices_in_their_own_batch(self):
+        env = environment()
+        domains = []
+        record = move(env, company(env))
+        record.search = lambda domain, order=None, limit=None: domains.append(domain) or []
+        record._cron_metanow_fiscal_poll()
+        self.assertEqual(len(domains), 2)
+        self.assertIn((outcome.ELECTRONIC, "=", True), domains[1])
+        self.assertIn((outcome.EINVOICE_STATE, "not in", list(outcome.EINVOICE_FINAL)), domains[1])
 
 
 def _qr(record):

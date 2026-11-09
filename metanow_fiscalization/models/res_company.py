@@ -57,6 +57,12 @@ class ResCompany(models.Model):
         ],
         string="Statusi i TVSH / VAT status",
     )
+    metanow_fiscal_einvoice = fields.Boolean(
+        string="Fatura elektronike për bizneset / E-invoices to businesses",
+        default=True,
+        help="Një faturë pa para në dorë për një blerës me numër tatimor dërgohet si faturë elektronike. "
+             "/ A non-cash invoice to a buyer with a tax number is sent as an e-invoice.",
+    )
     metanow_fiscal_profile = fields.Text(
         string="Profili i vendit nga efis / efis country profile",
         copy=False,
@@ -145,4 +151,5 @@ class ResCompany(models.Model):
             "operator_code": company.metanow_fiscal_operator_code,
             "software_code": company.metanow_fiscal_software_code,
             "device_code": company.metanow_fiscal_device_code,
+            "einvoice": bool(company.metanow_fiscal_einvoice),
         }

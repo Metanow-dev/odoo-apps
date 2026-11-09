@@ -54,6 +54,16 @@ class AccountMove(models.Model):
         string="Paralajmërimet e efis / efis's warnings", copy=False, readonly=True,
         help="Dokumenti është lëshuar; efis tregon diçka për t'u parë. "
              "/ The document is issued; efis points out something to look at.")
+    metanow_fiscal_electronic = fields.Boolean(
+        string="Faturë elektronike / E-invoice", copy=False, readonly=True,
+        help="Dërguar te efis si faturë elektronike për blerësin. / Sent to efis as an e-invoice for the buyer.")
+    metanow_fiscal_einvoice_state = fields.Char(
+        string="Gjendja e faturës elektronike / E-invoice state", copy=False, readonly=True)
+    metanow_fiscal_einvoice_eic = fields.Char(
+        string="EIC", copy=False, readonly=True,
+        help="Kodi që autoriteti i jep faturës elektronike. / The code the authority gives the e-invoice.")
+    metanow_fiscal_einvoice_error = fields.Text(
+        string="Gabimi i faturës elektronike / E-invoice error", copy=False, readonly=True)
     metanow_fiscal_qr_src = fields.Char(compute="_compute_metanow_fiscal_qr_src")
 
     @api.depends("metanow_fiscal_verification_url")
@@ -170,7 +180,8 @@ class AccountMove(models.Model):
         names = (
             outcome.DOCUMENT_ID, outcome.STATE, outcome.EFIS_STATE, outcome.FISCAL_NUMBER,
             outcome.SECURITY_CODE, outcome.REGISTRATION_CODE, outcome.VERIFICATION_URL,
-            outcome.ISSUED_AT, outcome.ERROR, outcome.WARNINGS,
+            outcome.ISSUED_AT, outcome.ERROR, outcome.WARNINGS, outcome.ELECTRONIC,
+            outcome.EINVOICE_STATE, outcome.EINVOICE_EIC, outcome.EINVOICE_ERROR,
         )
         return {name: self[name] or None for name in names}
 
@@ -210,7 +221,9 @@ class AccountMove(models.Model):
         except UserError as error:
             self._metanow_fiscal_store({outcome.STATE: outcome.PARKED, outcome.ERROR: str(error)})
             return
-        self._metanow_fiscal_apply(outcome.submission_values, response)
+        # Whether it went as an e-invoice is stored with efis's answer, in the same write.
+        self._metanow_fiscal_apply(
+            outcome.submission_values, response, extra={outcome.ELECTRONIC: bool(body.get("electronic"))})
         if self.metanow_fiscal_state == outcome.REFUSED and outcome.returns_to_draft(response):
             self._metanow_fiscal_return_to_draft()
 
@@ -239,15 +252,33 @@ class AccountMove(models.Model):
         if not self.metanow_fiscal_document_id or not self._metanow_fiscal_lock():
             return
         try:
-            response = self.company_id._metanow_fiscal_client().get_document(self.metanow_fiscal_document_id)
+            client = self.company_id._metanow_fiscal_client()
+            response = client.get_document(self.metanow_fiscal_document_id)
         except (efis_client.EfisUnavailable, UserError) as error:
             _logger.info("efis read of %s failed: %s", self.metanow_fiscal_document_id, error)
             return
-        self._metanow_fiscal_apply(outcome.poll_values, response)
+        einvoice = None
+        body = response.body if isinstance(response.body, dict) else {}
+        # The e-invoice is exchanged only after fiscalisation, so it is read once efis says the
+        # document is registered. Both answers go into the one write.
+        registered = 200 <= response.status < 300 and outcome.odoo_state(body.get("state")) == outcome.REGISTERED
+        if self.metanow_fiscal_electronic and registered:
+            try:
+                einvoice = client.get_document_einvoice(self.metanow_fiscal_document_id)
+            except efis_client.EfisUnavailable as error:
+                _logger.info("efis e-invoice read of %s failed: %s", self.metanow_fiscal_document_id, error)
+        self._metanow_fiscal_apply(outcome.poll_values, response, einvoice=einvoice)
 
-    def _metanow_fiscal_apply(self, reader, response):
+    def _metanow_fiscal_apply(self, reader, response, extra=None, einvoice=None):
         try:
-            values = reader(self._metanow_fiscal_current(), response)
+            current = self._metanow_fiscal_current()
+            values = reader(current, response)
+            if values and extra and response is not None and 200 <= response.status < 300:
+                values.update(extra)
+            if einvoice is not None:
+                einvoice_values = outcome.einvoice_values(current, einvoice)
+                if einvoice_values:
+                    values = dict(values or {}, **einvoice_values)
         except outcome.SecurityCodeConflict as error:
             # Never overwrite a stored code. Say so, loudly, and keep what is stored.
             _logger.error("efis answer conflicts with invoice %s: %s", self.id, error)
@@ -255,7 +286,8 @@ class AccountMove(models.Model):
         except ValueError as error:
             values = {outcome.ERROR: f"unreadable answer: {error}"}
         self._metanow_fiscal_store(values)
-        if values and values.get(outcome.STATE) in outcome.POLLED:
+        if values and (values.get(outcome.STATE) in outcome.POLLED
+                       or outcome.einvoice_pending(self._metanow_fiscal_current())):
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
 
     @api.model
@@ -266,6 +298,16 @@ class AccountMove(models.Model):
     @api.model
     def _cron_metanow_fiscal_poll(self):
         domain = [(outcome.STATE, "in", list(outcome.POLLED)), (outcome.DOCUMENT_ID, "!=", False)]
+        for move in self.search(domain, order="id", limit=BATCH):
+            move._metanow_fiscal_poll()
+        # Registered invoices whose e-invoice efis is still exchanging, in a batch of their own,
+        # so e-invoices waiting on the authority never hold back the documents above.
+        domain = [
+            (outcome.DOCUMENT_ID, "!=", False),
+            (outcome.ELECTRONIC, "=", True),
+            (outcome.STATE, "=", outcome.REGISTERED),
+            (outcome.EINVOICE_STATE, "not in", list(outcome.EINVOICE_FINAL)),
+        ]
         for move in self.search(domain, order="id", limit=BATCH):
             move._metanow_fiscal_poll()
 

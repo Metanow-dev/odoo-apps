@@ -161,6 +161,8 @@ def build(invoice, config, profile):
     _put(body, "softwareCode", _text(config.get("software_code")))
     if cash:
         body["deviceCode"] = device_code
+    if _electronic(config, method, cash, invoice.get("buyer")):
+        body["electronic"] = True
     # issuedAt is left out on purpose: efis stamps the moment it receives the document, which
     # is on time by construction (builder-log 75). Odoo's invoice_date is a date, not a moment.
     return body
@@ -245,6 +247,20 @@ def _line(number, line, issuer_in_vat, rates, exemptions):
     _put(built, "exemptionReason", exemption)
     _put(built, "itemCode", _text(line.get("item_code")))
     return built, problems, (untaxed, total - untaxed, total)
+
+
+def _electronic(config, method, cash, buyer):
+    """Whether this invoice goes to the buyer as an e-invoice (SubmitDocumentRequest.electronic).
+
+    Yes for a non-cash invoice to a buyer named by a tax number, while the company has e-invoices
+    on. A tax number here is the identifier efis reads by default, with no identifier type set on
+    the partner: a domestic taxpayer number. A buyer with another identifier (a passport, a foreign
+    VAT number) or none gets a plain fiscal invoice. efis refuses an e-invoice paid in cash, so a
+    cash invoice is never one.
+    """
+    if config.get("einvoice") is not True or not method or cash or not buyer:
+        return False
+    return bool(_text(buyer.get("identifier"))) and _text(buyer.get("identifier_type")) is None
 
 
 def _seller(config):

@@ -15,8 +15,9 @@ PAIR = ("POST", "/v1/pair")
 SUBMIT_DOCUMENT = ("POST", "/v1/documents")
 GET_DOCUMENT = ("GET", "/v1/documents/{id}")
 GET_PROFILE = ("GET", "/v1/profiles/{country}")
+GET_DOCUMENT_EINVOICE = ("GET", "/v1/documents/{documentId}/einvoice")
 
-ROUTES = (PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE)
+ROUTES = (PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE)
 
 USER_AGENT = "metanow_fiscalization"
 
@@ -93,6 +94,9 @@ class EfisClient:
 
     def get_document(self, document_id):
         return self._call(GET_DOCUMENT, {"id": document_id})
+
+    def get_document_einvoice(self, document_id):
+        return self._call(GET_DOCUMENT_EINVOICE, {"documentId": document_id})
 
     def get_profile(self, country):
         return self._call(GET_PROFILE, {"country": country}, authenticated=False)

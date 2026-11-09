@@ -12,6 +12,10 @@
                              help="Faturat e klientëve fiskalizohen nga efis kur postohen. / Customer invoices are fiscalised by efis when they are posted.">
                         <field name="metanow_fiscal_enabled"/>
                     </setting>
+                    <setting string="Fatura elektronike / E-invoices"
+                             help="Një faturë pa para në dorë për një blerës me numër tatimor dërgohet si faturë elektronike. / A non-cash invoice to a buyer with a tax number is sent as an e-invoice.">
+                        <field name="metanow_fiscal_einvoice"/>
+                    </setting>
                     <setting string="Lidhja me efis / Connection to efis" groups="base.group_system">
                         <div class="content-group">
                             <div class="row mt8">

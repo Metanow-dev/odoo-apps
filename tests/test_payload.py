@@ -61,6 +61,39 @@ class MoneyTests(unittest.TestCase):
         self.assertEqual(money.format_plain(Decimal("0.50")), "0.5")
 
 
+class ElectronicTests(unittest.TestCase):
+    def build(self, invoice=None, **config):
+        values = {"einvoice": True}
+        values.update(config)
+        return build(invoice or support.invoice(), support.config(**values), support.profile())
+
+    def with_buyer(self, **overrides):
+        buyer = dict(support.invoice()["buyer"])
+        buyer.update(overrides)
+        return support.invoice(buyer=buyer)
+
+    def test_a_non_cash_invoice_to_a_taxpayer_is_an_e_invoice(self):
+        self.assertIs(self.build()["electronic"], True)
+
+    def test_the_company_can_turn_e_invoices_off(self):
+        self.assertNotIn("electronic", self.build(einvoice=False))
+
+    def test_a_cash_invoice_is_never_an_e_invoice(self):
+        body = self.build(support.invoice(payment_method="BANKNOTE"), device_code="dd123dd123")
+        self.assertNotIn("electronic", body)
+
+    def test_a_buyer_without_a_tax_number_gets_a_fiscal_invoice(self):
+        self.assertNotIn("electronic", self.build(self.with_buyer(identifier=None)))
+        self.assertNotIn("electronic", self.build(support.invoice(buyer=None)))
+
+    def test_a_buyer_named_by_another_identifier_gets_a_fiscal_invoice(self):
+        self.assertNotIn("electronic", self.build(self.with_buyer(identifier="AB123456", identifier_type="passport")))
+
+    def test_the_flag_is_in_efis_request_schema(self):
+        properties = support.openapi()["components"]["schemas"]["SubmitDocumentRequest"]["properties"]
+        self.assertIn("electronic", properties)
+
+
 class BuyerKindTests(unittest.TestCase):
     def buyer(self, **overrides):
         buyer = dict(support.invoice()["buyer"])

@@ -14,6 +14,7 @@ class ResConfigSettings(models.TransientModel):
     metanow_fiscal_software_code = fields.Char(related="company_id.metanow_fiscal_software_code", readonly=False)
     metanow_fiscal_device_code = fields.Char(related="company_id.metanow_fiscal_device_code", readonly=False)
     metanow_fiscal_vat_status = fields.Selection(related="company_id.metanow_fiscal_vat_status", readonly=False)
+    metanow_fiscal_einvoice = fields.Boolean(related="company_id.metanow_fiscal_einvoice", readonly=False)
     # Typed here and exchanged at once. It is single-use, so it is not kept.
     metanow_fiscal_pairing_code = fields.Char(string="Kodi i çiftimit / Pairing code")
 
