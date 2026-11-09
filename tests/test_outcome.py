@@ -27,6 +27,24 @@ class SubmissionOutcomeTests(unittest.TestCase):
         self.assertEqual(values[outcome.STATE], outcome.REFUSED)
         self.assertIn("payments_do_not_match_total", values[outcome.ERROR])
 
+    def test_the_message_comes_first_and_the_code_after_it(self):
+        answer = Response(422, {"code": "cash_over_ceiling", "detail": "A cash invoice is at most 100000.00 ALL.",
+                                "retryable": False, "authorityCode": None, "correlationId": "c0ffee"})
+        values = outcome.submission_values(EMPTY, answer)
+        self.assertEqual(values[outcome.ERROR],
+                         "A cash invoice is at most 100000.00 ALL.\nKodi / Code: cash_over_ceiling · c0ffee")
+
+    def test_a_refusal_without_a_sentence_still_names_its_code(self):
+        values = outcome.submission_values(EMPTY, error(422, "buyer_personal_id_required"))
+        self.assertEqual(values[outcome.ERROR], "Kodi / Code: buyer_personal_id_required")
+
+    def test_only_a_refusal_before_numbering_returns_to_draft(self):
+        self.assertTrue(outcome.returns_to_draft(error(422, "cash_over_ceiling")))
+        self.assertTrue(outcome.returns_to_draft(error(400, "invalid_document")))
+        for status in (401, 403, 404, 409, 429, 502):
+            self.assertFalse(outcome.returns_to_draft(error(status, "x")), status)
+        self.assertFalse(outcome.returns_to_draft(None))
+
     def test_a_retryable_flag_on_a_4xx_is_honoured(self):
         values = outcome.submission_values(EMPTY, error(409, "in_progress", retryable=True))
         self.assertNotIn(outcome.STATE, values)

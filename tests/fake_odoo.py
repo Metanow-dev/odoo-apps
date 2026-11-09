@@ -5,6 +5,7 @@ receives, and super()._post() and friends stand for what Odoo itself would do. T
 exercised by the odoo-install CI job (DEV-1731), not here.
 """
 
+import contextlib
 import sys
 import types
 
@@ -43,6 +44,15 @@ class Cursor:
         if self._last in self.locked:
             return None
         return (self._last,)
+
+    @contextlib.contextmanager
+    def savepoint(self, flush=True):
+        self.statements.append(("SAVEPOINT", None))
+        try:
+            yield
+        except Exception:
+            self.statements.append(("ROLLBACK TO SAVEPOINT", None))
+            raise
 
 
 class Trigger:
@@ -132,6 +142,10 @@ class Model:
         return self
 
     def button_draft(self):
+        # A test sets draft_refusal to stand for Odoo refusing, e.g. a lock date.
+        refusal = getattr(self, "draft_refusal", None)
+        if refusal:
+            raise UserError(refusal)
         self.base_calls.append("button_draft")
         return True
 

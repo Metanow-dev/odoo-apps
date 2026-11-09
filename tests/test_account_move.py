@@ -179,6 +179,57 @@ class SendTests(unittest.TestCase):
         self.assertEqual(record.metanow_fiscal_state, outcome.REFUSED)
         self.assertEqual(len(record.writes), 1)
 
+    def test_a_refusal_before_numbering_returns_to_draft_with_efis_message(self):
+        refusals = {
+            "buyer_personal_id_required": (
+                "An export to an individual names buyer.identifier with buyer.identifierType personal_id, "
+                "foreign_tax or passport (Law 87/2019 Art. 9(2))."),
+            "cash_over_ceiling": "A cash invoice between two taxpayers is at most 100000.00 ALL.",
+        }
+        for code, detail in refusals.items():
+            with self.subTest(code=code):
+                record, opener = self.queued((422, {
+                    "code": code, "detail": detail, "retryable": False, "authorityCode": None,
+                    "correlationId": "c0ffee"}))
+                record._metanow_fiscal_send()
+                self.assertEqual(record.metanow_fiscal_state, outcome.REFUSED)
+                self.assertIn("button_draft", record.base_calls, "the invoice goes back to draft to be corrected")
+                self.assertIn(detail, record.metanow_fiscal_error, "efis's message is shown in full")
+                self.assertIn(code, record.metanow_fiscal_error, "the code is shown for support")
+                self.assertEqual(len(record.writes), 1, "the refusal is one write")
+                record._metanow_fiscal_send()
+                self.assertEqual(len(opener.requests), 1, "a refusal is a client fault: never retried")
+
+    def test_odoo_refusing_the_draft_leaves_it_refused_with_both_messages(self):
+        record, opener = self.queued((422, {
+            "code": "cash_over_ceiling", "detail": "Over the ceiling.", "retryable": False, "authorityCode": None}))
+        record.draft_refusal = "The lock date is after this invoice."
+        record._metanow_fiscal_send()
+        self.assertEqual(record.metanow_fiscal_state, outcome.REFUSED)
+        self.assertNotIn("button_draft", record.base_calls)
+        self.assertIn("Over the ceiling.", record.metanow_fiscal_error)
+        self.assertIn("The lock date is after this invoice.", record.metanow_fiscal_error)
+        self.assertIn(("ROLLBACK TO SAVEPOINT", None), record.env.cr.statements)
+        self.assertEqual(len(opener.requests), 1)
+
+    def test_a_refusal_that_is_not_before_numbering_stays_posted(self):
+        record, _ = self.queued((409, {"code": "conflict", "retryable": False, "authorityCode": None}))
+        record._metanow_fiscal_send()
+        self.assertEqual(record.metanow_fiscal_state, outcome.REFUSED)
+        self.assertNotIn("button_draft", record.base_calls)
+
+    def test_a_corrected_invoice_is_posted_as_a_new_request(self):
+        record, opener = self.queued(
+            (422, {"code": "cash_over_ceiling", "detail": "Over.", "retryable": False, "authorityCode": None}),
+            (202, support.document_response()))
+        record._metanow_fiscal_send()
+        record._post()
+        self.assertEqual(record.metanow_fiscal_state, outcome.TO_SEND)
+        self.assertIs(record.metanow_fiscal_error, False, "the old refusal is cleared on posting again")
+        record._metanow_fiscal_send()
+        first, second = opener.requests
+        self.assertNotEqual(first["headers"]["idempotency-key"], second["headers"]["idempotency-key"])
+
     def test_no_answer_keeps_it_queued_with_the_same_key_and_body(self):
         import urllib.error
         record, opener = self.queued(urllib.error.URLError("down"), (202, support.document_response()))

@@ -12,6 +12,15 @@
                         invisible="metanow_fiscal_state != 'parked'"
                         groups="account.group_account_invoice"/>
             </xpath>
+            <xpath expr="//header" position="after">
+                <div class="alert alert-danger mb-0" role="alert"
+                     invisible="metanow_fiscal_state != 'refused'">
+                    <strong>efis e refuzoi këtë faturë dhe nuk shpenzoi asnjë numër. Korrigjojeni dhe postojeni përsëri.
+                        / efis refused this invoice and spent no number. Correct it and post it again.</strong>
+                    <field name="metanow_fiscal_error" readonly="1" nolabel="1" class="d-block text-break"
+                           style="white-space: pre-wrap;"/>
+                </div>
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="metanow_fiscal" string="Fiskalizimi / Fiscalisation"
                       invisible="not metanow_fiscal_state">

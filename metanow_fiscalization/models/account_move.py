@@ -1,7 +1,7 @@
 import logging
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 from ..efis import client as efis_client
 from ..efis import outcome
@@ -211,6 +211,28 @@ class AccountMove(models.Model):
             self._metanow_fiscal_store({outcome.STATE: outcome.PARKED, outcome.ERROR: str(error)})
             return
         self._metanow_fiscal_apply(outcome.submission_values, response)
+        if self.metanow_fiscal_state == outcome.REFUSED and outcome.returns_to_draft(response):
+            self._metanow_fiscal_return_to_draft()
+
+    def _metanow_fiscal_return_to_draft(self):
+        """Put an invoice efis refused before numbering back in draft, with efis's message on it.
+
+        Nothing was numbered, so nothing fiscal is undone: the person who posted it corrects it and
+        posts again, and that posting is a new request with a new key. It is never resent as it is.
+        If Odoo will not reset it (a lock date, for example), it stays posted as refused, with the
+        message, and a person resets it.
+        """
+        self.ensure_one()
+        try:
+            with self.env.cr.savepoint():
+                self.button_draft()
+        except (UserError, ValidationError) as error:
+            _logger.warning("invoice %s refused by efis could not return to draft: %s", self.id, error)
+            self._metanow_fiscal_store({
+                outcome.ERROR: f"{self.metanow_fiscal_error}\n"
+                               f"Odoo nuk e ktheu faturën në draft; kthejeni me dorë. "
+                               f"/ Odoo did not return the invoice to draft; reset it by hand: {error}",
+            })
 
     def _metanow_fiscal_poll(self):
         self.ensure_one()

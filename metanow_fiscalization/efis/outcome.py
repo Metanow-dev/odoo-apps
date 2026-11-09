@@ -114,16 +114,26 @@ def document_values(current, document):
 
 
 def _error_text(response):
+    """efis's PlatformError for a person: its sentence in full first, then the code for support."""
     body = response.body if isinstance(response.body, dict) else {}
     code = body.get("code") or f"http_{response.status}"
-    detail = body.get("detail")
+    detail = str(body.get("detail") or "").strip()
     correlation = body.get("correlationId")
-    text = str(code)
-    if detail:
-        text += f": {detail}"
+    reference = f"Kodi / Code: {code}"
     if correlation:
-        text += f" (correlation {correlation})"
-    return text
+        reference += f" · {correlation}"
+    return f"{detail}\n{reference}" if detail else reference
+
+
+# The answers to POST /v1/documents that efis gives before anything is numbered: the body was
+# refused as it stands (spec/openapi/v1.json; efis DocumentSubmission.IssueStoredAsync). Only
+# these send the invoice back to draft for correction. Any other refusal stays as it is.
+REFUSED_BEFORE_NUMBERING = (400, 422)
+
+
+def returns_to_draft(response):
+    """True when efis refused the invoice before numbering it, so Odoo may correct it in draft."""
+    return response is not None and response.status in REFUSED_BEFORE_NUMBERING
 
 
 def submission_values(current, response):
