@@ -35,7 +35,9 @@
                                 <field name="metanow_fiscal_pairing_code"/>
                             </div>
                             <div class="mt8">
-                                <button name="action_metanow_fiscal_pair" type="object" class="btn-link"
+                                <!-- "execute" is the settings save: it runs set_values, which
+                                     exchanges the code, without the unsaved-changes dialog. -->
+                                <button name="execute" type="object" class="btn-link"
                                         icon="oi-arrow-right"
                                         string="Çifto me efis / Pair with efis"/>
                                 <button name="action_metanow_fiscal_refresh_profile" type="object" class="btn-link"

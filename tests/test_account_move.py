@@ -9,6 +9,7 @@ from metanow_fiscalization.efis import outcome
 from metanow_fiscalization.efis.client import EfisClient
 from metanow_fiscalization.models.account_move import AccountMove
 from metanow_fiscalization.models.res_company import ResCompany
+from metanow_fiscalization.models.res_config_settings import ResConfigSettings
 
 FISCAL_FIELDS = {
     outcome.DOCUMENT_ID, outcome.STATE, outcome.EFIS_STATE, outcome.FISCAL_NUMBER,
@@ -415,6 +416,33 @@ class PairingTests(unittest.TestCase):
         with self.assertRaises(fake_odoo.UserError):
             record._metanow_fiscal_pair("000")
         self.assertEqual(record.writes, [])
+
+    def test_saving_the_settings_exchanges_a_typed_code_after_the_rest_is_saved(self):
+        # Odoo's settings page saves and reloads before any other button runs, so the code is
+        # exchanged by the save itself.
+        env = environment()
+        opener = support.FakeOpener(
+            (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
+            (200, support.PROFILE_DOCUMENT))
+        record = company(env, opener=opener, metanow_fiscal_credential=False)
+        settings = ResConfigSettings(env, company_id=record, metanow_fiscal_pairing_code=" 123-456 ")
+        settings.set_values()
+        self.assertEqual(settings.base_calls, ["set_values"])
+        self.assertEqual(record.writes[0]["metanow_fiscal_credential"], "c-9")
+        self.assertFalse(settings.metanow_fiscal_pairing_code, "the single-use code is not kept")
+
+    def test_saving_the_settings_without_a_code_calls_nothing(self):
+        env = environment()
+        opener = support.FakeOpener()
+        record = company(env, opener=opener)
+        ResConfigSettings(env, company_id=record).set_values()
+        self.assertEqual(opener.requests, [])
+        self.assertEqual(record.writes, [])
+
+    def test_the_pair_button_is_the_settings_save(self):
+        view = (support.MODULE_DIR / "views" / "res_config_settings_views.xml").read_text(encoding="utf-8")
+        self.assertIn('<button name="execute" type="object"', view)
+        self.assertNotIn("action_metanow_fiscal_pair", view)
 
 
 if __name__ == "__main__":

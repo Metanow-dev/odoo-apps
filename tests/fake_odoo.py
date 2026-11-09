@@ -159,7 +159,8 @@ class Model:
 
 
 class TransientModel(Model):
-    pass
+    def set_values(self):
+        self.base_calls.append("set_values")
 
 
 def _identity_decorator(*args, **kwargs):
