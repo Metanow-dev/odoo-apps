@@ -12,7 +12,7 @@ talks to the tax authority. It needs an efis account and pairs with efis using a
 from the efis web app. Nothing is sent until an administrator turns fiscalisation on and pairs the
 company.
 """,
-    "version": "20.0.1.0.2",
+    "version": "20.0.1.0.3",
     "category": "Accounting/Localizations",
     "author": "Metanow",
     "website": "https://metanow.com",
