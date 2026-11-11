@@ -27,6 +27,7 @@ company.
         "views/account_tax_views.xml",
         "views/res_partner_views.xml",
         "views/res_country_views.xml",
+        "views/res_users_views.xml",
         "report/report_invoice.xml",
     ],
     "images": [

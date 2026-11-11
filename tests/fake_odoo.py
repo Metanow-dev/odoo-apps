@@ -81,6 +81,11 @@ class Env:
         self.refs = {}
         self.models = {"ir.config_parameter": Parameters({"database.uuid": "db-0001"})}
         self.search_results = []
+        # The user posting, the company being worked in, and the companies the user has open.
+        # A test sets them when it needs them.
+        self.user = None
+        self.company = None
+        self.companies = []
 
     def __getitem__(self, name):
         return self.models[name]
@@ -123,6 +128,15 @@ class Model:
     def sudo(self):
         return self
 
+    def with_company(self, company):
+        # Odoo reads company-dependent fields for the given company; a test sets them per company
+        # in company_values.
+        values = getattr(self, "company_values", {}).get(id(company), {})
+        view = type(self).__new__(type(self))
+        view.__dict__.update(self.__dict__)
+        view.__dict__.update(values)
+        return view
+
     def invalidate_recordset(self, fnames=None):
         self.base_calls.append("invalidate_recordset")
 
@@ -159,6 +173,9 @@ class Model:
 
 
 class TransientModel(Model):
+    def get_values(self):
+        return {}
+
     def set_values(self):
         self.base_calls.append("set_values")
 

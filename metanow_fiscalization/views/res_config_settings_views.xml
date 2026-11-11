@@ -48,25 +48,31 @@
                     </setting>
                     <setting string="Kodet e regjistrimit / Registration codes">
                         <div class="content-group">
+                            <!-- DEV-2436: the codes come from efis's registry; a stored code efis does
+                                 not confirm, or a registry not read yet, is said here. -->
+                            <div class="alert alert-warning mt8" role="alert"
+                                 invisible="not metanow_fiscal_registry_notice">
+                                <field name="metanow_fiscal_registry_notice"/>
+                            </div>
                             <div class="row mt8">
                                 <label for="metanow_fiscal_vat_status" class="col-lg-4 o_light_label"/>
                                 <field name="metanow_fiscal_vat_status"/>
                             </div>
                             <div class="row mt8">
-                                <label for="metanow_fiscal_business_unit_code" class="col-lg-4 o_light_label"/>
-                                <field name="metanow_fiscal_business_unit_code"/>
+                                <label for="metanow_fiscal_business_unit_code_pick" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_business_unit_code_pick"/>
                             </div>
                             <div class="row mt8">
-                                <label for="metanow_fiscal_operator_code" class="col-lg-4 o_light_label"/>
-                                <field name="metanow_fiscal_operator_code"/>
+                                <label for="metanow_fiscal_operator_code_pick" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_operator_code_pick"/>
                             </div>
                             <div class="row mt8">
-                                <label for="metanow_fiscal_software_code" class="col-lg-4 o_light_label"/>
-                                <field name="metanow_fiscal_software_code"/>
+                                <label for="metanow_fiscal_software_code_pick" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_software_code_pick"/>
                             </div>
                             <div class="row mt8">
-                                <label for="metanow_fiscal_device_code" class="col-lg-4 o_light_label"/>
-                                <field name="metanow_fiscal_device_code"/>
+                                <label for="metanow_fiscal_device_code_pick" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_device_code_pick"/>
                             </div>
                         </div>
                     </setting>

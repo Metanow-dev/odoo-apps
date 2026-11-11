@@ -20,6 +20,7 @@ from fake_odoo import install  # noqa: E402
 install()
 
 from metanow_fiscalization.efis.profile import Profile  # noqa: E402
+from metanow_fiscalization.efis.registry import Registry  # noqa: E402
 
 
 def openapi():
@@ -61,6 +62,22 @@ PROFILE_DOCUMENT = {
         ]},
     ],
 }
+
+
+# The codes efis has confirmed for the test business (RegistryCodesResponse). config() below
+# names the first of each; the second is another confirmed code a person may pick.
+REGISTRY_DOCUMENT = {
+    "businessUnits": ["bb123bb123", "bb456bb456"],
+    "operators": ["oo123oo123", "oo456oo456"],
+    "devices": ["dd123dd123", "dd456dd456"],
+    "software": ["ss123ss123"],
+    "internalAct": None,
+    "numberingModel": None,
+}
+
+
+def registry():
+    return Registry(json.loads(json.dumps(REGISTRY_DOCUMENT)))
 
 
 def profile():
