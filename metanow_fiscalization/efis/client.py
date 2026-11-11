@@ -20,10 +20,13 @@ GET_REGISTRY = ("GET", "/v1/registry")
 LIST_PAYMENTS_RECEIVED = ("GET", "/v1/receivables/{documentId}/payments")
 RECORD_PAYMENT_RECEIVED = ("POST", "/v1/receivables/{documentId}/payments")
 WITHDRAW_PAYMENT_RECEIVED = ("POST", "/v1/receivables/payments/{paymentId}/withdraw")
+LIST_PAYMENT_RECORDS = ("GET", "/v1/einvoices/payment-records")
+CREATE_PAYMENT_RECORD = ("POST", "/v1/einvoices/payment-records")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
+    LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -115,15 +118,24 @@ class EfisClient:
     def withdraw_payment_received(self, payment_id):
         return self._call(WITHDRAW_PAYMENT_RECEIVED, {"paymentId": payment_id})
 
+    # DEV-2434: Instruction 24 payment records. efis filters the list by the day each is due.
+    def list_payment_records(self, due_from, due_to):
+        return self._call(LIST_PAYMENT_RECORDS, {}, query={"dueFrom": due_from, "dueTo": due_to})
+
+    def create_payment_record(self, record):
+        return self._call(CREATE_PAYMENT_RECORD, {}, body=record)
+
     def get_registry(self):
         return self._call(GET_REGISTRY, {})
 
     def get_profile(self, country):
         return self._call(GET_PROFILE, {"country": country}, authenticated=False)
 
-    def _call(self, route, parameters, body=None, headers=None, authenticated=True):
+    def _call(self, route, parameters, body=None, headers=None, authenticated=True, query=None):
         method, template = route
         path = template.format(**{key: urllib.parse.quote(str(value), safe="") for key, value in parameters.items()})
+        if query:
+            path += "?" + urllib.parse.urlencode({key: str(value) for key, value in query.items() if value is not None})
         request = urllib.request.Request(self.base_url + path, method=method)
         request.add_header("Accept", "application/json")
         request.add_header("User-Agent", self.user_agent)

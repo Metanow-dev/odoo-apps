@@ -61,6 +61,16 @@
                                 invisible="not metanow_fiscal_payments_error"
                                 groups="account.group_account_invoice"/>
                     </group>
+                    <!-- DEV-2434: Instruction 24 records of this e-invoice's cash payments. -->
+                    <group name="metanow_fiscal_payment_records"
+                           string="Regjistrimet e pagesave me para në dorë / Cash payment records"
+                           invisible="not metanow_fiscal_payment_records_summary and not metanow_fiscal_payment_records_note">
+                        <field name="metanow_fiscal_payment_record_due" invisible="not metanow_fiscal_payment_record_due"/>
+                        <field name="metanow_fiscal_payment_records_summary" nolabel="1" colspan="2"
+                               style="white-space: pre-wrap;"/>
+                        <field name="metanow_fiscal_payment_records_note" nolabel="1" colspan="2" class="text-danger"
+                               style="white-space: pre-wrap;" invisible="not metanow_fiscal_payment_records_note"/>
+                    </group>
                     <field name="metanow_fiscal_warnings" invisible="not metanow_fiscal_warnings"/>
                     <field name="metanow_fiscal_error" invisible="not metanow_fiscal_error"/>
                 </page>
@@ -77,6 +87,10 @@
                 <filter name="metanow_fiscal_attention"
                         string="Fiskalizimi kërkon veprim / Fiscalisation needs action"
                         domain="['|', ('metanow_fiscal_state', 'in', ('parked', 'refused', 'rejected')), ('metanow_fiscal_einvoice_state', '=', 'refused')]"/>
+                <!-- DEV-2434: e-invoices with a cash payment record still to file on the platform. -->
+                <filter name="metanow_fiscal_payment_records_due"
+                        string="Regjistrime pagesash për t'u depozituar / Payment records to file"
+                        domain="[('metanow_fiscal_payment_record_due', '!=', False)]"/>
                 <filter name="metanow_fiscal_pending"
                         string="Në pritje të efis / Waiting for efis"
                         domain="[('metanow_fiscal_state', 'in', ('to_send', 'sent', 'deferred'))]"/>

@@ -22,6 +22,14 @@ class Integer(Field):
     default_value = 0
 
 
+class Date(Field):
+    # Odoo's "today" in the user's time zone; a test passes its own day where it matters.
+    @staticmethod
+    def context_today(record):
+        import datetime
+        return datetime.date.today()
+
+
 class UserError(Exception):
     pass
 
@@ -204,6 +212,7 @@ def install():
     for name in ("Char", "Text", "Selection", "Boolean", "Many2one", "Datetime", "Float", "Monetary"):
         setattr(fields, name, type(name, (Field,), {}))
     fields.Integer = Integer
+    fields.Date = Date
     models = types.ModuleType("odoo.models")
     models.Model = Model
     models.TransientModel = TransientModel
