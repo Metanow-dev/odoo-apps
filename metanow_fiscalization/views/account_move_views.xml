@@ -51,6 +51,16 @@
                         <field name="metanow_fiscal_einvoice_eic"/>
                         <field name="metanow_fiscal_einvoice_error" invisible="not metanow_fiscal_einvoice_error"/>
                     </group>
+                    <!-- DEV-2432: the invoice's payments, as sent to efis's receivables. -->
+                    <group name="metanow_fiscal_payments" string="Pagesat në efis / Payments in efis"
+                           invisible="move_type != 'out_invoice'">
+                        <field name="metanow_fiscal_payments_pending"/>
+                        <field name="metanow_fiscal_payments_error" invisible="not metanow_fiscal_payments_error"/>
+                        <button name="action_metanow_fiscal_send_payments" type="object" class="btn-link" colspan="2"
+                                string="Dërgo pagesat te efis përsëri / Send the payments to efis again"
+                                invisible="not metanow_fiscal_payments_error"
+                                groups="account.group_account_invoice"/>
+                    </group>
                     <field name="metanow_fiscal_warnings" invisible="not metanow_fiscal_warnings"/>
                     <field name="metanow_fiscal_error" invisible="not metanow_fiscal_error"/>
                 </page>

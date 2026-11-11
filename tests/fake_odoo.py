@@ -211,6 +211,7 @@ def install():
     api.model = _identity_decorator
     api.depends = _identity_decorator
     api.constrains = _identity_decorator
+    api.model_create_multi = _identity_decorator
     exceptions = types.ModuleType("odoo.exceptions")
     exceptions.UserError = UserError
     exceptions.ValidationError = ValidationError

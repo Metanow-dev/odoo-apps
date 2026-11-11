@@ -178,6 +178,12 @@ def build(invoice, config, profile):
     if electronic:
         due_date, einvoice, einvoice_problems = _einvoice_fields(invoice, method)
         problems.extend(einvoice_problems)
+    elif not cash and invoice.get("corrects") is None:
+        # DEV-2432 (Gleni, 11 Nov 2026): every non-cash invoice carries Odoo's due date (the
+        # authority's optional PayDeadline), because efis tracks payments only on an invoice that
+        # has one. A cash invoice is paid on the spot; a correction is never a receivable.
+        due_date, due_problems = _due_date(invoice)
+        problems.extend(due_problems)
 
     if problems:
         raise PayloadInvalid(problems)
@@ -203,11 +209,10 @@ def build(invoice, config, profile):
     _put(body, "softwareCode", _text(config.get("software_code")))
     if cash:
         body["deviceCode"] = device_code
+    _put(body, "paymentDueDate", due_date)
     if electronic:
         body["electronic"] = True
-        # DEV-2358: what an e-invoice carries beyond the fiscal record (efis DEV-2354), and the
-        # payment due date (efis's paymentDueDate). A plain fiscal invoice is unchanged.
-        _put(body, "paymentDueDate", due_date)
+        # DEV-2358: what an e-invoice carries beyond the fiscal record (efis DEV-2354).
         _put(body, "einvoice", einvoice)
     # issuedAt is left out on purpose: efis stamps the moment it receives the document, which
     # is on time by construction (builder-log 75). Odoo's invoice_date is a date, not a moment.
@@ -341,14 +346,7 @@ def _einvoice_fields(invoice, method):
     the delivery date. Each is left out when Odoo has none. A value efis would refuse is refused
     here, before posting, so no number is spent on it.
     """
-    problems = []
-    due_date = _text(invoice.get("due_date"))
-    if due_date is not None:
-        try:
-            date.fromisoformat(due_date)
-        except ValueError:
-            problems.append(
-                f"Afati i pagesës {due_date} nuk është datë. / The payment due date {due_date} is not a date.")
+    due_date, problems = _due_date(invoice)
 
     part = {}
     bank = invoice.get("bank") or {}
@@ -379,6 +377,18 @@ def _einvoice_fields(invoice, method):
                 f"Data e dorëzimit {delivered} nuk është datë. / The delivery date {delivered} is not a date.")
 
     return due_date, (part or None), problems
+
+
+def _due_date(invoice):
+    """Odoo's due date as efis's paymentDueDate, or None when Odoo has none."""
+    due_date = _text(invoice.get("due_date"))
+    if due_date is None:
+        return None, []
+    try:
+        date.fromisoformat(due_date)
+    except ValueError:
+        return None, [f"Afati i pagesës {due_date} nuk është datë. / The payment due date {due_date} is not a date."]
+    return due_date, []
 
 
 def _is_iban(iban):

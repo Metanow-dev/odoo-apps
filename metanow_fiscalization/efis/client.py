@@ -17,8 +17,14 @@ GET_DOCUMENT = ("GET", "/v1/documents/{id}")
 GET_PROFILE = ("GET", "/v1/profiles/{country}")
 GET_DOCUMENT_EINVOICE = ("GET", "/v1/documents/{documentId}/einvoice")
 GET_REGISTRY = ("GET", "/v1/registry")
+LIST_PAYMENTS_RECEIVED = ("GET", "/v1/receivables/{documentId}/payments")
+RECORD_PAYMENT_RECEIVED = ("POST", "/v1/receivables/{documentId}/payments")
+WITHDRAW_PAYMENT_RECEIVED = ("POST", "/v1/receivables/payments/{paymentId}/withdraw")
 
-ROUTES = (PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY)
+ROUTES = (
+    PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
+    LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
+)
 
 USER_AGENT = "metanow_fiscalization"
 
@@ -98,6 +104,16 @@ class EfisClient:
 
     def get_document_einvoice(self, document_id):
         return self._call(GET_DOCUMENT_EINVOICE, {"documentId": document_id})
+
+    # DEV-2432. No X-Acting-* headers: they are a partner key's, and this is the module's credential.
+    def list_payments_received(self, document_id):
+        return self._call(LIST_PAYMENTS_RECEIVED, {"documentId": document_id})
+
+    def record_payment_received(self, document_id, payment):
+        return self._call(RECORD_PAYMENT_RECEIVED, {"documentId": document_id}, body=payment)
+
+    def withdraw_payment_received(self, payment_id):
+        return self._call(WITHDRAW_PAYMENT_RECEIVED, {"paymentId": payment_id})
 
     def get_registry(self):
         return self._call(GET_REGISTRY, {})

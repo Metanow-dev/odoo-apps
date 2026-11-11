@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='type']" position="after">
-                <field name="metanow_fiscal_payment_method" invisible="type != 'sale'"/>
+                <field name="metanow_fiscal_payment_method" invisible="type not in ('sale', 'bank', 'cash')"/>
                 <field name="metanow_fiscal_device_code" invisible="type != 'sale'"/>
             </xpath>
         </field>

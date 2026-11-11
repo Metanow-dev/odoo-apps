@@ -6,7 +6,10 @@ from odoo.exceptions import UserError, ValidationError
 from ..efis import client as efis_client
 from ..efis import outcome
 from ..efis import payload as efis_payload
+from ..efis import money
 from ..efis import qr
+from ..efis import receivables
+from ..efis.profile import PAYMENT_METHODS
 
 _logger = logging.getLogger(__name__)
 
@@ -33,6 +36,17 @@ CORRECTION_KINDS = [
     (efis_payload.CORRECTIVE, "Gabim në faturë / Mistake on the invoice"),
     (efis_payload.CREDIT, "Kthim ose zbritje / Return or discount"),
 ]
+
+# DEV-2432: what efis said when it would not take a payment, in the person's words. Any other
+# refusal is shown with efis's code.
+PAYMENT_REFUSALS = {
+    "not_receivable": "efis nuk ndjek pagesat e kësaj fature (nuk ka afat pagese, ose është me para në dorë). "
+                      "/ efis does not track payments on this invoice (it has no due date, or it was paid in cash).",
+    "payment_exceeds_outstanding": "Pagesat e kësaj fature kalojnë shumën që mbetet për t'u paguar në efis. "
+                                   "/ The payments on this invoice are more than efis says is still owed.",
+    "invalid_method": "efis nuk e njeh mënyrën e pagesës së ditarit. / efis does not know the journal's payment method.",
+    "invalid_paid_on": "Data e pagesës nuk pranohet nga efis. / efis does not accept the payment date.",
+}
 
 # The states of an invoice efis has registered with the authority, which a credit note may
 # reverse. A superseded invoice was corrected before, and may be credited again.
@@ -82,6 +96,12 @@ class AccountMove(models.Model):
     # carries the same code.
     metanow_fiscal_operator_code = fields.Char(
         string="Kodi i operatorit / Operator code", copy=False, readonly=True)
+    # DEV-2432: the invoice's payments are sent to efis's receivables by a job. Set whenever
+    # Odoo's payments on it change; cleared once efis holds what Odoo has.
+    metanow_fiscal_payments_pending = fields.Boolean(
+        string="Pagesat në pritje për efis / Payments waiting for efis", copy=False, readonly=True, index=True)
+    metanow_fiscal_payments_error = fields.Text(
+        string="Gabimi i pagesave / Payments error", copy=False, readonly=True)
     metanow_fiscal_correction_kind = fields.Selection(
         CORRECTION_KINDS,
         string="Nota e kreditit për efis / Credit note for efis",
@@ -459,3 +479,136 @@ class AccountMove(models.Model):
                             f"{move.name}: {name} është ruajtur nga efis dhe nuk ndryshohet. "
                             f"/ {name} was stored from efis and is never changed.")
         return super().write(vals)
+
+    # ------------------------------------------------------------------ payments (DEV-2432)
+
+    def _metanow_fiscal_payments_apply(self):
+        """Whether efis tracks this invoice's payments: an invoice efis has numbered, not refused."""
+        self.ensure_one()
+        return (self.move_type == "out_invoice" and bool(self.company_id.metanow_fiscal_enabled)
+                and self.metanow_fiscal_state not in (outcome.REJECTED, outcome.REFUSED))
+
+    def _metanow_fiscal_mark_payments(self):
+        """Odoo's payments on these invoices changed: send them to efis on the next pass."""
+        invoices = self.filtered(lambda move: move.move_type == "out_invoice" and move.company_id.metanow_fiscal_enabled)
+        if invoices:
+            invoices.sudo().write({"metanow_fiscal_payments_pending": True})
+            self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
+
+    def _metanow_fiscal_wanted_payments(self):
+        """The payments Odoo holds on this invoice, as efis would record them, keyed by reference.
+
+        Money that came in counts: a reconciliation with a payment or a bank statement line, and a
+        payment Odoo recorded without a journal entry. A reconciliation with a credit note does not
+        count; efis already takes the credit note off what is owed.
+        """
+        self.ensure_one()
+        database = self.env["ir.config_parameter"].sudo().get_str("database.uuid") or "db"
+        profile = self.company_id._metanow_fiscal_profile()
+        known = profile.codes(PAYMENT_METHODS) if profile is not None else set()
+        wanted = {}
+        problems = []
+
+        def add(kind, record_id, amount, paid_on, journal):
+            method = (journal.metanow_fiscal_payment_method or "").strip().upper()
+            if not method:
+                problems.append(
+                    f"Ditari {journal.name} nuk ka mënyrë pagese për efis. / The journal {journal.name} has no efis payment method.")
+                return
+            if method not in known:
+                problems.append(
+                    f"Mënyra e pagesës {method} e ditarit {journal.name} nuk njihet nga efis. "
+                    f"/ efis does not know the payment method {method} of the journal {journal.name}.")
+                return
+            wanted[receivables.reference(database, kind, record_id)] = {
+                "amount": money.format_money(money.cents(amount)),
+                "paidOn": paid_on.isoformat(),
+                "method": method,
+            }
+
+        receivable_lines = self.line_ids.filtered(lambda line: line.account_id.account_type == "asset_receivable")
+        for partial in receivable_lines.matched_credit_ids:
+            counterpart = partial.credit_move_id.move_id
+            payment = counterpart.origin_payment_id
+            if not payment and not counterpart.statement_line_id:
+                continue
+            paid_on = payment.date if payment else counterpart.date
+            add("rec", partial.id, partial.amount, paid_on, counterpart.journal_id)
+        for payment in self.matched_payment_ids:
+            if payment.move_id or payment.state not in ("paid", "reconciled"):
+                continue
+            invoices = payment.invoice_ids.filtered(lambda move: move.move_type == "out_invoice")
+            if len(invoices) != 1:
+                problems.append(
+                    f"Pagesa {payment.name} paguan disa fatura pa regjistrim kontabël, prandaj nuk ndahet dot; "
+                    "vendosni një llogari në pritje në ditarin e saj. / The payment "
+                    f"{payment.name} pays several invoices without a journal entry, so it cannot be split; "
+                    "give its journal an outstanding account.")
+                continue
+            add("pay", payment.id, payment.amount, payment.date, payment.journal_id)
+        return wanted, problems
+
+    def _metanow_fiscal_sync_payments(self, today=None):
+        """One pass: make efis's payments on this invoice what Odoo's are."""
+        self.ensure_one()
+        if not self._metanow_fiscal_lock() or not self.metanow_fiscal_payments_pending:
+            return
+        if not self._metanow_fiscal_payments_apply():
+            self._metanow_fiscal_store({"metanow_fiscal_payments_pending": False, "metanow_fiscal_payments_error": False})
+            return
+        if not self.metanow_fiscal_document_id:
+            return  # Not numbered yet: a later pass records them.
+        wanted, problems = self._metanow_fiscal_wanted_payments()
+        if problems:
+            # Odoo's own setup is wrong. Nothing is sent until a person fixes it and sends again.
+            self._metanow_fiscal_store({"metanow_fiscal_payments_pending": False,
+                                        "metanow_fiscal_payments_error": "\n".join(problems)})
+            return
+        document = self.metanow_fiscal_document_id
+        database = self.env["ir.config_parameter"].sudo().get_str("database.uuid") or "db"
+        try:
+            client = self.company_id._metanow_fiscal_client()
+            listing = client.list_payments_received(document)
+            if listing.status != 200:
+                return self._metanow_fiscal_payments_failed(listing)
+            held = (listing.body or {}).get("payments") or []
+            withdraw, record, waiting = receivables.plan(
+                wanted, held, database, today or fields.Date.context_today(self))
+            # Withdrawn first, so a payment recorded again is never counted twice against what is owed.
+            for payment_id in withdraw:
+                answer = client.withdraw_payment_received(payment_id)
+                if answer.status not in (200, 404):
+                    return self._metanow_fiscal_payments_failed(answer)
+            for payment in record:
+                answer = client.record_payment_received(document, payment)
+                if answer.status != 201:
+                    return self._metanow_fiscal_payments_failed(answer)
+        except efis_client.EfisUnavailable as error:
+            # No answer: the next pass reads what efis holds and carries on from there.
+            self._metanow_fiscal_store({"metanow_fiscal_payments_error": f"efis_unavailable: {error}"})
+            return
+        except UserError as error:
+            self._metanow_fiscal_store({"metanow_fiscal_payments_pending": False, "metanow_fiscal_payments_error": str(error)})
+            return
+        self._metanow_fiscal_store({"metanow_fiscal_payments_pending": waiting, "metanow_fiscal_payments_error": False})
+
+    def _metanow_fiscal_payments_failed(self, answer):
+        """efis would not do it. A refusal of the request (4xx) is never retried; efis's own trouble is."""
+        body = answer.body if isinstance(answer.body, dict) else {}
+        code = body.get("code") or str(answer.status)
+        message = PAYMENT_REFUSALS.get(code, f"efis: {code}")
+        retry = answer.status >= 500 or answer.status == 429
+        self._metanow_fiscal_store({"metanow_fiscal_payments_pending": retry, "metanow_fiscal_payments_error": message})
+
+    @api.model
+    def _cron_metanow_fiscal_payments(self):
+        for move in self.search([("metanow_fiscal_payments_pending", "=", True)], order="id", limit=BATCH):
+            move._metanow_fiscal_sync_payments()
+
+    def action_metanow_fiscal_send_payments(self):
+        """Send this invoice's payments to efis again, after a person has fixed what was wrong."""
+        for move in self:
+            if move.move_type == "out_invoice":
+                move.write({"metanow_fiscal_payments_pending": True})
+        self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
+        return True
