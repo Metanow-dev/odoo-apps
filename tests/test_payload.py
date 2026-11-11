@@ -123,10 +123,25 @@ class EinvoiceFieldsTests(unittest.TestCase):
             "delivery": {"date": "2026-11-09"},
         })
 
-    def test_a_plain_fiscal_invoice_carries_none_of_them(self):
+    def test_a_plain_fiscal_invoice_carries_only_the_due_date(self):
+        # DEV-2432: efis tracks payments only on an invoice with a due date.
         body = self.build(self.invoice(), einvoice=False)
-        self.assertNotIn("paymentDueDate", body)
+        self.assertEqual(body["paymentDueDate"], "2026-12-10")
         self.assertNotIn("einvoice", body)
+
+    def test_a_cash_invoice_carries_no_due_date(self):
+        body = self.build(self.invoice(payment_method="BANKNOTE"), einvoice=False, device_code="dd123dd123")
+        self.assertNotIn("paymentDueDate", body)
+
+    def test_a_plain_credit_note_carries_no_due_date(self):
+        corrects = {"security_code": support.SECURITY_CODE, "issued_at": "2026-10-20T10:15:00+02:00",
+                    "kind": "credit", "electronic": False}
+        body = self.build(self.invoice(corrects=corrects), einvoice=False)
+        self.assertNotIn("paymentDueDate", body)
+
+    def test_a_due_date_that_is_not_a_date_is_refused(self):
+        with self.assertRaises(PayloadInvalid):
+            self.build(self.invoice(due_date="10/12/2026"), einvoice=False)
 
     def test_what_odoo_does_not_have_is_left_out(self):
         body = self.build(self.invoice(due_date=None, customer_reference=None, delivery_date=None, bank=None))

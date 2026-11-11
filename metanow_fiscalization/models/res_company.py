@@ -1,3 +1,4 @@
+import json
 import logging
 
 from odoo import api, fields, models
@@ -81,6 +82,15 @@ class ResCompany(models.Model):
         copy=False,
         readonly=True,
     )
+    # DEV-2433: received e-invoices become draft vendor bills, from the day this is turned on.
+    metanow_fiscal_inbound_enabled = fields.Boolean(
+        string="E-faturat e marra si fatura furnitori / Received e-invoices as vendor bills",
+        help="Çdo e-faturë që një furnitor i dërgon biznesit bëhet një faturë furnitori në draft. "
+             "/ Each e-invoice a supplier sends the business becomes a draft vendor bill.")
+    metanow_fiscal_inbound_since = fields.Date(
+        string="Nga data / From",
+        help="Vetëm e-faturat e marra nga kjo ditë. / Only e-invoices received from this day.")
+    metanow_fiscal_inbound_ignored = fields.Text(copy=False, readonly=True)
     metanow_fiscal_registry = fields.Text(
         string="Kodet e konfirmuara në efis / Codes confirmed in efis",
         copy=False,
@@ -232,3 +242,25 @@ class ResCompany(models.Model):
             "device_code": company.metanow_fiscal_device_code,
             "einvoice": bool(company.metanow_fiscal_einvoice),
         }
+
+    def write(self, vals):
+        # Turned on without a day: from today, so the business's whole history is not imported.
+        if not (vals.get("metanow_fiscal_inbound_enabled") and not vals.get("metanow_fiscal_inbound_since")):
+            return super().write(vals)
+        today = fields.Date.context_today(self)
+        for company in self:
+            super(ResCompany, company).write(dict(
+                vals, metanow_fiscal_inbound_since=company.metanow_fiscal_inbound_since or today))
+        return True
+
+    def _metanow_fiscal_inbound_ignored(self):
+        self.ensure_one()
+        try:
+            return set(json.loads(self.metanow_fiscal_inbound_ignored or "[]"))
+        except ValueError:
+            return set()
+
+    def _metanow_fiscal_ignore_inbound(self, inbound_id):
+        self.ensure_one()
+        ignored = self._metanow_fiscal_inbound_ignored() | {inbound_id}
+        self.write({"metanow_fiscal_inbound_ignored": json.dumps(sorted(ignored))})

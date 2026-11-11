@@ -22,6 +22,14 @@ class Integer(Field):
     default_value = 0
 
 
+class Date(Field):
+    # Odoo's "today" in the user's time zone; a test passes its own day where it matters.
+    @staticmethod
+    def context_today(record):
+        import datetime
+        return datetime.date.today()
+
+
 class UserError(Exception):
     pass
 
@@ -176,6 +184,10 @@ class TransientModel(Model):
     def get_values(self):
         return {}
 
+    def _prepare_default_reversal(self, move):
+        # What Odoo's reversal wizard puts on a credit note, reduced to one recorded key.
+        return {"ref": "Reversal"}
+
     def set_values(self):
         self.base_calls.append("set_values")
 
@@ -200,6 +212,7 @@ def install():
     for name in ("Char", "Text", "Selection", "Boolean", "Many2one", "Datetime", "Float", "Monetary"):
         setattr(fields, name, type(name, (Field,), {}))
     fields.Integer = Integer
+    fields.Date = Date
     models = types.ModuleType("odoo.models")
     models.Model = Model
     models.TransientModel = TransientModel
@@ -207,6 +220,7 @@ def install():
     api.model = _identity_decorator
     api.depends = _identity_decorator
     api.constrains = _identity_decorator
+    api.model_create_multi = _identity_decorator
     exceptions = types.ModuleType("odoo.exceptions")
     exceptions.UserError = UserError
     exceptions.ValidationError = ValidationError

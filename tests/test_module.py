@@ -56,6 +56,12 @@ FROZEN_XML_IDS = {
     "report_invoice_document_metanow_fiscal",
     # DEV-2436: the operator code on the user form.
     "view_users_form_metanow_fiscal",
+    # DEV-2431: the credit note's kind in the reversal wizard.
+    "view_account_move_reversal_metanow_fiscal",
+    # DEV-2432: the job that sends invoice payments to efis's receivables.
+    "ir_cron_metanow_fiscal_payments",
+    # DEV-2433: the job that reads received e-invoices.
+    "ir_cron_metanow_fiscal_inbound",
 }
 
 
@@ -108,7 +114,7 @@ class InvariantTests(unittest.TestCase):
     def test_the_odoo_free_layer_imports_without_odoo(self):
         script = (
             "import sys; sys.path.insert(0, sys.argv[1]);"
-            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry;"
+            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound;"
             "assert 'odoo' not in sys.modules"
         )
         subprocess.run([sys.executable, "-I", "-c", script, str(MODULE)], check=True)

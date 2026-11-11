@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <!-- DEV-2431: what the credit note is, for efis, chosen when it is made. -->
+    <record id="view_account_move_reversal_metanow_fiscal" model="ir.ui.view">
+        <field name="name">account.move.reversal.form.metanow_fiscal</field>
+        <field name="model">account.move.reversal</field>
+        <field name="inherit_id" ref="account.view_account_move_reversal"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='reason']" position="after">
+                <field name="metanow_fiscal_enabled" invisible="1"/>
+                <field name="metanow_fiscal_correction_kind"
+                       invisible="not metanow_fiscal_enabled or move_type not in ('out_invoice', 'some_invoice')"
+                       required="metanow_fiscal_enabled and move_type == 'out_invoice'"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

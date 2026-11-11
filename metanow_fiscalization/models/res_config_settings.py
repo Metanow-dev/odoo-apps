@@ -27,6 +27,8 @@ class ResConfigSettings(models.TransientModel):
     metanow_fiscal_registry_notice = fields.Text(compute="_compute_metanow_fiscal_registry_notice")
     metanow_fiscal_vat_status = fields.Selection(related="company_id.metanow_fiscal_vat_status", readonly=False)
     metanow_fiscal_einvoice = fields.Boolean(related="company_id.metanow_fiscal_einvoice", readonly=False)
+    metanow_fiscal_inbound_enabled = fields.Boolean(related="company_id.metanow_fiscal_inbound_enabled", readonly=False)
+    metanow_fiscal_inbound_since = fields.Date(related="company_id.metanow_fiscal_inbound_since", readonly=False)
     # Typed here and exchanged when the settings are saved. It is single-use, so it is not kept.
     metanow_fiscal_pairing_code = fields.Char(string="Kodi i çiftimit / Pairing code")
 
