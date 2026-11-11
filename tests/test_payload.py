@@ -94,6 +94,70 @@ class ElectronicTests(unittest.TestCase):
         self.assertIn("electronic", properties)
 
 
+class EinvoiceFieldsTests(unittest.TestCase):
+    """DEV-2358: what an e-invoice carries beyond the fiscal record (efis DEV-2354)."""
+
+    IBAN = "AL35202111090000000001234567"
+
+    def invoice(self, **overrides):
+        values = {
+            "due_date": "2026-12-10",
+            "customer_reference": "PO-778",
+            "delivery_date": "2026-11-09",
+            "bank": {"iban": "al35 2021 1109 0000 0000 0123 4567", "bic": "sgsbalta", "holder": "Shembull sh.p.k."},
+        }
+        values.update(overrides)
+        return support.invoice(**values)
+
+    def build(self, invoice, **config):
+        values = {"einvoice": True}
+        values.update(config)
+        return build(invoice, support.config(**values), support.profile())
+
+    def test_an_e_invoice_carries_the_due_date_the_account_the_reference_and_the_delivery_date(self):
+        body = self.build(self.invoice())
+        self.assertEqual(body["paymentDueDate"], "2026-12-10")
+        self.assertEqual(body["einvoice"], {
+            "payment": {"accountId": self.IBAN, "serviceProvider": "SGSBALTA", "accountName": "Shembull sh.p.k."},
+            "buyerReference": "PO-778",
+            "delivery": {"date": "2026-11-09"},
+        })
+
+    def test_a_plain_fiscal_invoice_carries_none_of_them(self):
+        body = self.build(self.invoice(), einvoice=False)
+        self.assertNotIn("paymentDueDate", body)
+        self.assertNotIn("einvoice", body)
+
+    def test_what_odoo_does_not_have_is_left_out(self):
+        body = self.build(self.invoice(due_date=None, customer_reference=None, delivery_date=None, bank=None))
+        self.assertIs(body["electronic"], True)
+        self.assertNotIn("paymentDueDate", body)
+        self.assertNotIn("einvoice", body)
+
+    def test_an_account_belongs_only_to_a_credit_transfer(self):
+        from metanow_fiscalization.efis.payload import _einvoice_fields
+        _, part, problems = _einvoice_fields(self.invoice(customer_reference=None, delivery_date=None), "COMPENSATION")
+        self.assertEqual(problems, [])
+        self.assertIsNone(part)
+
+    def test_an_account_efis_would_refuse_is_refused_before_posting(self):
+        with self.assertRaises(PayloadInvalid) as bad_iban:
+            self.build(self.invoice(bank={"iban": "AL35202111090000000001234568"}))
+        self.assertIn("IBAN", str(bad_iban.exception))
+        with self.assertRaises(PayloadInvalid) as bad_bic:
+            self.build(self.invoice(bank={"iban": self.IBAN, "bic": "SGS"}))
+        self.assertIn("BIC", str(bad_bic.exception))
+
+    def test_every_e_invoice_key_sent_is_a_property_efis_publishes(self):
+        document = support.openapi()
+        properties = _schema_properties(document, "SubmitDocumentRequest")
+        body = self.build(self.invoice())
+        self.assertLessEqual(set(body), properties["SubmitDocumentRequest"])
+        self.assertLessEqual(set(body["einvoice"]), properties["EinvoicePart"])
+        self.assertLessEqual(set(body["einvoice"]["payment"]), properties["EinvoicePaymentPart"])
+        self.assertLessEqual(set(body["einvoice"]["delivery"]), properties["EinvoiceDeliveryPart"])
+
+
 class BuyerKindTests(unittest.TestCase):
     def buyer(self, **overrides):
         buyer = dict(support.invoice()["buyer"])

@@ -79,6 +79,10 @@ def move(env, owner, **overrides):
         amount_total=240.0,
         amount_untaxed=200.0,
         amount_tax=40.0,
+        # Odoo's standard invoice fields DEV-2358 reads, unset as Odoo leaves them.
+        invoice_date_due=False,
+        ref=False,
+        partner_bank_id=False,
     )
     values.update(overrides)
     return AccountMove(env, **values)
@@ -289,6 +293,32 @@ class EinvoiceSendTests(unittest.TestCase):
         record, opener = self.sent()
         self.assertIs(opener.requests[0]["body"]["electronic"], True)
         self.assertIs(record.metanow_fiscal_electronic, True)
+
+    def test_an_e_invoice_reads_the_due_date_the_bank_account_and_the_reference_from_the_invoice(self):
+        from datetime import date
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        account = SimpleNamespace(
+            acc_type="iban", acc_number="AL35 2021 1109 0000 0000 0123 4567",
+            bank_id=SimpleNamespace(bic="SGSBALTA"), acc_holder_name="Shembull sh.p.k.")
+        record = move(
+            env, company(env, opener=opener, metanow_fiscal_einvoice=True),
+            invoice_date_due=date(2026, 12, 10), ref="PO-778", partner_bank_id=account)
+        record._post()
+        record._metanow_fiscal_send()
+        body = opener.requests[0]["body"]
+        self.assertEqual(body["paymentDueDate"], "2026-12-10")
+        self.assertEqual(body["einvoice"]["payment"]["accountId"], "AL35202111090000000001234567")
+        self.assertEqual(body["einvoice"]["buyerReference"], "PO-778")
+
+    def test_a_bank_account_that_is_not_an_iban_is_not_sent(self):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        account = SimpleNamespace(acc_type="bank", acc_number="123456", bank_id=False, acc_holder_name=False)
+        record = move(env, company(env, opener=opener, metanow_fiscal_einvoice=True), partner_bank_id=account)
+        record._post()
+        record._metanow_fiscal_send()
+        self.assertNotIn("einvoice", opener.requests[0]["body"])
 
     def test_off_in_the_company_sends_a_plain_fiscal_invoice(self):
         env = environment()
