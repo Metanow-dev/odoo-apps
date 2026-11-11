@@ -38,28 +38,32 @@ test:
       python - <<'EOF'
       import ast, os, sys
       series = os.environ["ODOO_SERIES"]
-      for module in ("metanow_fiscalization", "metanow_fiscalization_stock"):
+      for module in ("metanow_fiscalization", "metanow_fiscalization_stock", "metanow_fiscalization_pos"):
           version = ast.literal_eval(open(f"{module}/__manifest__.py", encoding="utf-8").read())["version"]
           if not version.startswith(series + "."):
               sys.exit(f"{module} manifest version {version} is not for series {series}")
       EOF
 
 # DEV-1766: one zip for every customer, byte-identical on every rebuild, with its SHA-256 and a
-# manifest.json for the efis web app's Plugins page. DEV-2429: the stock add-on is a zip of its
-# own, with its own manifest.json in dist/odoo-stock; dist/odoo is the main module's, as before.
+# manifest.json for the efis web app's Plugins page. DEV-2429 and DEV-2437: each add-on is a zip
+# of its own, with its own manifest.json, in dist/odoo-stock and dist/odoo-pos; dist/odoo is the
+# main module's, as before.
 package:
   stage: package
   image: python:3.13-alpine
   script:
     - python tools/package.py --out dist/odoo --manifest
     - python tools/package.py --module metanow_fiscalization_stock --out dist/odoo-stock --manifest
+    - python tools/package.py --module metanow_fiscalization_pos --out dist/odoo-pos --manifest
     - python -m zipfile -e dist/odoo/metanow_fiscalization-*.zip dist/odoo/addons
     - python -m zipfile -e dist/odoo-stock/metanow_fiscalization_stock-*.zip dist/odoo/addons
-    - cat dist/odoo/*.sha256 dist/odoo-stock/*.sha256
+    - python -m zipfile -e dist/odoo-pos/metanow_fiscalization_pos-*.zip dist/odoo/addons
+    - cat dist/odoo/*.sha256 dist/odoo-stock/*.sha256 dist/odoo-pos/*.sha256
   artifacts:
     paths:
       - dist/odoo/
       - dist/odoo-stock/
+      - dist/odoo-pos/
     expire_in: 90 days
 
 # DEV-1731: the zip installed into a disposable Odoo beside the pinned efis image, posting one
@@ -112,7 +116,7 @@ release:
       test -n "$ODOO_APPS_PUSH_TOKEN" || { echo "ODOO_APPS_PUSH_TOKEN must be set, protected and masked: a project access token of this project, Maintainer, write_repository." >&2; exit 1; }
     - |
       released=0
-      for entry in metanow_fiscalization:dist/odoo metanow_fiscalization_stock:dist/odoo-stock; do
+      for entry in metanow_fiscalization:dist/odoo metanow_fiscalization_stock:dist/odoo-stock metanow_fiscalization_pos:dist/odoo-pos; do
         MODULE="${entry%%:*}"; DIR="${entry#*:}"
         ZIP="$(ls "$DIR/$MODULE"-*.zip)"
         VERSION="$(basename "$ZIP" .zip | sed "s/^$MODULE-//")"

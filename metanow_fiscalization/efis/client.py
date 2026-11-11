@@ -30,6 +30,8 @@ SUBMIT_TRANSPORT_DOCUMENT = ("POST", "/v1/transport-documents")
 LIST_TRANSPORT_DOCUMENTS = ("GET", "/v1/transport-documents")
 SUBMIT_TRANSPORT_INVOICE = ("POST", "/v1/transport-invoices")
 LIST_TRANSPORT_INVOICES = ("GET", "/v1/transport-invoices")
+SUBMIT_CASH_DEPOSIT = ("POST", "/v1/cash-deposits")
+LIST_CASH_DEPOSITS = ("GET", "/v1/cash-deposits")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
@@ -37,6 +39,7 @@ ROUTES = (
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
     LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
     SUBMIT_TRANSPORT_DOCUMENT, LIST_TRANSPORT_DOCUMENTS, SUBMIT_TRANSPORT_INVOICE, LIST_TRANSPORT_INVOICES,
+    SUBMIT_CASH_DEPOSIT, LIST_CASH_DEPOSITS,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -168,6 +171,15 @@ class EfisClient:
 
     def list_transport_invoices(self):
         return self._call(LIST_TRANSPORT_INVOICES, {})
+
+    # DEV-2437: Point of Sale cash, for the POS add-on (metanow_fiscalization_pos).
+    def submit_cash_deposit(self, deposit, idempotency_key):
+        if not idempotency_key:
+            raise ValueError("A cash deposit is never sent without an idempotency key.")
+        return self._call(SUBMIT_CASH_DEPOSIT, {}, body=deposit, headers={"Idempotency-Key": idempotency_key})
+
+    def list_cash_deposits(self):
+        return self._call(LIST_CASH_DEPOSITS, {})
 
     def get_registry(self):
         return self._call(GET_REGISTRY, {})

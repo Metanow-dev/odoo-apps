@@ -10,6 +10,7 @@ ODOO_DIR = Path(__file__).resolve().parents[1]
 REPO = ODOO_DIR
 MODULE_DIR = ODOO_DIR / "metanow_fiscalization"
 STOCK_DIR = ODOO_DIR / "metanow_fiscalization_stock"
+POS_DIR = ODOO_DIR / "metanow_fiscalization_pos"
 # efis's published API, copied from the efis version EFIS_IMAGE names. contract/README.md.
 OPENAPI = REPO / "contract" / "efis-openapi-v1.json"
 

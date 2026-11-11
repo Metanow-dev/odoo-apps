@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="view_pos_session_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">pos.session.form.metanow_fiscal</field>
+        <field name="model">pos.session</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_session_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='closing_balance']" position="after">
+                <field name="metanow_fiscal_initial_state" invisible="not metanow_fiscal_initial_state"/>
+                <field name="metanow_fiscal_initial_registration_code" invisible="not metanow_fiscal_initial_registration_code"/>
+                <field name="metanow_fiscal_initial_error" invisible="not metanow_fiscal_initial_error"/>
+                <field name="metanow_fiscal_cash_summary" invisible="not metanow_fiscal_cash_summary"
+                       style="white-space: pre-wrap;"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

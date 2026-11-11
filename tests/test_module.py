@@ -17,6 +17,7 @@ import support
 
 MODULE = support.MODULE_DIR
 STOCK = support.STOCK_DIR
+POS = support.POS_DIR
 
 
 def _token(*parts):
@@ -76,6 +77,15 @@ FROZEN_STOCK_XML_IDS = {
     "report_delivery_document_metanow_fiscal",
     # DEV-2430: the transport invoice switch in Settings.
     "res_config_settings_view_form_metanow_fiscal_stock",
+}
+
+
+# DEV-2437: the Point of Sale add-on's.
+FROZEN_POS_XML_IDS = {
+    "ir_cron_metanow_fiscal_pos_send",
+    "ir_cron_metanow_fiscal_pos_poll",
+    "pos_config_view_form_metanow_fiscal",
+    "view_pos_session_form_metanow_fiscal",
 }
 
 
@@ -256,6 +266,45 @@ class StockManifestTests(ManifestTests):
 
 class StockAppsStoreTests(AppsStoreTests):
     MODULE = STOCK
+
+
+# DEV-2437: the Point of Sale add-on, likewise. It prints nothing, so it has no report.
+class PosInvariantTests(InvariantTests):
+    MODULE = POS
+    REPORT = None
+
+    def test_the_printed_labels_are_the_only_authority_words_and_only_in_the_report(self):
+        for path in module_files(POS, ".xml"):
+            source = path.read_text(encoding="utf-8")
+            for word in AUTHORITY_VOCABULARY:
+                self.assertNotRegex(source, rf"(?i)\b{re.escape(word)}\b", f"{path.name}: {word}")
+
+    def test_the_odoo_free_layer_imports_without_odoo(self):
+        script = (
+            "import sys, types, importlib.util; sys.path.insert(0, sys.argv[1]);"
+            "import efis, efis.money;"
+            "main = types.ModuleType('odoo.addons.metanow_fiscalization');"
+            "sys.modules.update({'odoo': types.ModuleType('odoo'), 'odoo.addons': types.ModuleType('odoo.addons'),"
+            " 'odoo.addons.metanow_fiscalization': main, 'odoo.addons.metanow_fiscalization.efis': efis,"
+            " 'odoo.addons.metanow_fiscalization.efis.money': efis.money});"
+            "spec = importlib.util.spec_from_file_location('deposits', sys.argv[2]);"
+            "spec.loader.exec_module(importlib.util.module_from_spec(spec));"
+            "assert not [name for name in sys.modules if name in ('odoo.models', 'odoo.fields', 'odoo.api')]"
+        )
+        subprocess.run([sys.executable, "-I", "-c", script, str(MODULE), str(POS / "efis" / "deposits.py")], check=True)
+
+
+class PosManifestTests(ManifestTests):
+    MODULE = POS
+    FROZEN = FROZEN_POS_XML_IDS
+
+    def test_it_is_an_add_on_to_the_main_module_and_point_of_sale(self):
+        self.assertEqual(manifest(POS)["depends"], ["metanow_fiscalization", "point_of_sale"])
+        self.assertNotIn("point_of_sale", manifest(MODULE)["depends"], "the main module never makes a customer install POS")
+
+
+class PosAppsStoreTests(AppsStoreTests):
+    MODULE = POS
 
 
 def _package_tool():

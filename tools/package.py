@@ -9,8 +9,8 @@ checksum a customer can compare with the one the efis web app shows.
 
 Usage: package.py [--module NAME] [--out DIR] [--manifest]   (prints the zip path and its SHA-256)
 
---module picks the module (DEV-2429): metanow_fiscalization by default, or the stock add-on
-metanow_fiscalization_stock. Each module is its own zip, with its own manifest.json; give each
+--module picks the module (DEV-2429): metanow_fiscalization by default, the stock add-on
+metanow_fiscalization_stock, or the Point of Sale add-on metanow_fiscalization_pos (DEV-2437). Each module is its own zip, with its own manifest.json; give each
 its own --out so the two manifests do not overwrite each other.
 
 With --manifest it also writes manifest.json beside the zip: the file name, the module's
@@ -29,7 +29,7 @@ from pathlib import Path
 
 ODOO_DIR = Path(__file__).resolve().parents[1]
 MODULE = "metanow_fiscalization"
-MODULES = (MODULE, "metanow_fiscalization_stock")
+MODULES = (MODULE, "metanow_fiscalization_stock", "metanow_fiscalization_pos")
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 # Nothing a customer must not receive, and nothing that is not the module.

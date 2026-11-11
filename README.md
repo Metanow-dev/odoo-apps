@@ -11,6 +11,7 @@ year. The two meet only at efis's public API (`contract/README.md`).
 | Path | What it is |
 | --- | --- |
 | `metanow_fiscalization/` | The module. The Odoo Apps store reads this folder. |
+| `metanow_fiscalization_pos/` | The Point of Sale add-on (DEV-2437): the cash register's opening float and cash in and out, declared through efis. It depends on `point_of_sale`. The store reads this folder too. |
 | `metanow_fiscalization_stock/` | The stock add-on (DEV-2429): warehouse transfer notes for stock transfers. It depends on `stock`, so the main module never makes a customer install Inventory. The store reads this folder too. |
 | `tests/` | Unit tests. They need no Odoo and no network. |
 | `tools/package.py` | Builds the reproducible zip. |
@@ -31,7 +32,7 @@ year. The two meet only at efis's public API (`contract/README.md`).
 
 A release publishes each module's zip, its SHA-256 and its `manifest.json` to this project's
 package registry (Deploy › Package registry, `metanow_fiscalization/<version>` and
-`metanow_fiscalization_stock/<version>`), then moves `20.0`.
+`metanow_fiscalization_stock/<version>` and `metanow_fiscalization_pos/<version>`), then moves `20.0`.
 
 When Odoo 21 comes, first branch `release/20.0` from `main` if 20.0 will still need fixes. Then, on
 `develop`, set `ODOO_SERIES` and `EFIS_ODOO_IMAGE` in `.gitlab-ci.yml` to 21.0 and the manifest's
@@ -44,6 +45,7 @@ registered on the store as a new series.
 python -m unittest discover -s tests -t tests      # Python 3.13, no Odoo needed
 python tools/package.py --out dist/odoo            # prints the zip and its SHA-256
 python tools/package.py --module metanow_fiscalization_stock --out dist/odoo-stock
+python tools/package.py --module metanow_fiscalization_pos --out dist/odoo-pos
 ```
 
 The install check needs Docker and the efis image: see `ci/odoo-install.sh`.
