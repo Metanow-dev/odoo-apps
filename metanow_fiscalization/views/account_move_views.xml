@@ -21,6 +21,12 @@
                            style="white-space: pre-wrap;"/>
                 </div>
             </xpath>
+            <!-- DEV-2431: what a credit note is, for efis. Chosen in draft, never after sending. -->
+            <xpath expr="//field[@name='invoice_date']" position="after">
+                <field name="metanow_fiscal_correction_kind"
+                       invisible="move_type != 'out_refund'"
+                       readonly="state != 'draft'"/>
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="metanow_fiscal" string="Fiskalizimi / Fiscalisation"
                       invisible="not metanow_fiscal_state">

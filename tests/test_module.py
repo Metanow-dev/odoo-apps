@@ -56,6 +56,8 @@ FROZEN_XML_IDS = {
     "report_invoice_document_metanow_fiscal",
     # DEV-2436: the operator code on the user form.
     "view_users_form_metanow_fiscal",
+    # DEV-2431: the credit note's kind in the reversal wizard.
+    "view_account_move_reversal_metanow_fiscal",
 }
 
 

@@ -28,6 +28,13 @@ from .profile import (
 BUSINESS = "business"
 BUYER_KINDS = (BUSINESS,)
 
+# CorrectionInput.kind for an Odoo credit note (DEV-2431). The person chooses: a mistake on the
+# invoice is a corrective, a return or a discount is a credit. efis also accepts "debit", which
+# an Odoo credit note never is.
+CORRECTIVE = "corrective"
+CREDIT = "credit"
+CORRECTION_KINDS = (CORRECTIVE, CREDIT)
+
 # The national currency, which efis and the authority's request leave implicit.
 NATIONAL_CURRENCY = "ALL"
 
@@ -84,6 +91,13 @@ def build(invoice, config, profile):
     if not reference:
         problems.append("Fatura nuk ka numër. / The invoice has no number.")
 
+    # DEV-2431: a credit note goes as a correction of the invoice it reverses. Odoo keeps its
+    # quantities and amounts positive and reads the sign from the move type; efis wants them
+    # negative, through the quantity, never the unit price (CanonicalDraft: negative_unit_price).
+    correction, correction_problems = _correction(invoice.get("corrects"))
+    problems.extend(correction_problems)
+    sign = -1 if invoice.get("corrects") is not None else 1
+
     # The profile's currency list is the authority's foreign-currency codes and does not contain
     # the lek: a lek invoice carries no Currency element, and efis reads an absent payment
     # currency as the national one (DocumentContracts.PaymentInput, CanonicalDraft.NationalCurrency).
@@ -117,7 +131,7 @@ def build(invoice, config, profile):
     if not source_lines:
         problems.append("Fatura nuk ka rreshta. / The invoice has no lines.")
     for number, line in enumerate(source_lines, start=1):
-        built, line_problems, amounts = _line(number, line, issuer_in_vat, rates, exemptions)
+        built, line_problems, amounts = _line(number, line, issuer_in_vat, rates, exemptions, sign)
         problems.extend(line_problems)
         if built is not None:
             lines.append(built)
@@ -126,9 +140,9 @@ def build(invoice, config, profile):
             total_sum += amounts[2]
 
     try:
-        total = money.cents(invoice.get("amount_total"))
-        untaxed = money.cents(invoice.get("amount_untaxed"))
-        tax = money.cents(invoice.get("amount_tax"))
+        total = sign * money.cents(invoice.get("amount_total"))
+        untaxed = sign * money.cents(invoice.get("amount_untaxed"))
+        tax = sign * money.cents(invoice.get("amount_tax"))
     except (money.NotExact, TypeError):
         problems.append("Totalet e faturës nuk janë në qindarka. / The invoice totals are not whole cents.")
         total = untaxed = tax = None
@@ -142,14 +156,24 @@ def build(invoice, config, profile):
                 "/ efis would compute totals that differ from Odoo's "
                 f"(untaxed {money.format_money(untaxed_sum)}, VAT {money.format_money(tax_sum)}, "
                 f"total {money.format_money(total_sum)}). Use per-line tax rounding.")
-        if total < 0:
+        if total < 0 and correction is None:
             problems.append(
                 "Një faturë nuk mund të jetë negative. / An invoice total cannot be negative.")
 
     buyer, buyer_problems = _buyer(invoice.get("buyer"), profile)
     problems.extend(buyer_problems)
 
-    electronic = _electronic(config, method, cash, invoice.get("buyer"))
+    if invoice.get("corrects") is not None:
+        # DEV-2431: a credit note is an e-invoice exactly when the invoice it corrects was one.
+        electronic = bool(invoice["corrects"].get("electronic"))
+        if electronic and cash:
+            problems.append(
+                "Fatura që korrigjohet ishte faturë elektronike, prandaj edhe nota e kreditit duhet të jetë, "
+                "dhe efis nuk pranon faturë elektronike me para në dorë; zgjidhni një ditar pa para në dorë. "
+                "/ The invoice this corrects was an e-invoice, so the credit note must be one too, and efis "
+                "refuses an e-invoice paid in cash; choose a non-cash journal.")
+    else:
+        electronic = _electronic(config, method, cash, invoice.get("buyer"))
     due_date = einvoice = None
     if electronic:
         due_date, einvoice, einvoice_problems = _einvoice_fields(invoice, method)
@@ -173,6 +197,7 @@ def build(invoice, config, profile):
     }
     if buyer is not None:
         body["buyer"] = buyer
+    _put(body, "corrects", correction)
     _put(body, "businessUnitCode", _text(config.get("business_unit_code")))
     _put(body, "operatorCode", _text(config.get("operator_code")))
     _put(body, "softwareCode", _text(config.get("software_code")))
@@ -189,7 +214,7 @@ def build(invoice, config, profile):
     return body
 
 
-def _line(number, line, issuer_in_vat, rates, exemptions):
+def _line(number, line, issuer_in_vat, rates, exemptions, sign=1):
     problems = []
     label = f"Rreshti {number} / Line {number}"
     description = _text(line.get("description"))
@@ -260,14 +285,38 @@ def _line(number, line, issuer_in_vat, rates, exemptions):
     built = {
         "description": description,
         "unit": unit,
-        "quantity": money.format_plain(quantity),
+        "quantity": money.format_plain(sign * quantity),
         "unitPriceBeforeTax": money.format_plain(before),
         "unitPriceAfterTax": money.format_plain(after),
         "taxRate": money.format_plain(rate),
     }
     _put(built, "exemptionReason", exemption)
     _put(built, "itemCode", _text(line.get("item_code")))
-    return built, problems, (untaxed, total - untaxed, total)
+    return built, problems, (sign * untaxed, sign * (total - untaxed), sign * total)
+
+
+def _correction(corrects):
+    """The reference a credit note carries to the invoice it reverses (CorrectionInput).
+
+    The security code and the issue time are the original's, as efis returned them; the kind is
+    the one the person chose.
+    """
+    if corrects is None:
+        return None, []
+    problems = []
+    kind = _text(corrects.get("kind"))
+    if kind not in CORRECTION_KINDS:
+        problems.append(
+            "Zgjidhni nëse nota e kreditit korrigjon një gabim në faturë apo regjistron një kthim ose zbritje. "
+            "/ Choose whether the credit note corrects a mistake on the invoice or records a return or discount.")
+    code = _text(corrects.get("security_code"))
+    issued_at = _text(corrects.get("issued_at"))
+    if not code or not issued_at:
+        problems.append(
+            "Fatura që kthehet nuk është fiskalizuar nga efis. / The invoice being reversed was not fiscalised by efis.")
+    if problems:
+        return None, problems
+    return {"securityCode": code, "issuedAt": issued_at, "kind": kind}, []
 
 
 def _electronic(config, method, cash, buyer):

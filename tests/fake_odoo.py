@@ -176,6 +176,10 @@ class TransientModel(Model):
     def get_values(self):
         return {}
 
+    def _prepare_default_reversal(self, move):
+        # What Odoo's reversal wizard puts on a credit note, reduced to one recorded key.
+        return {"ref": "Reversal"}
+
     def set_values(self):
         self.base_calls.append("set_values")
 
