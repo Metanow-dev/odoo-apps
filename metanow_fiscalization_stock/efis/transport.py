@@ -6,20 +6,38 @@ from the sequence of the business unit the goods leave from (Udhëzim 20 Art. 26
 it, computes its security code and registers it; this file only builds the request from plain
 values the model reads, and refuses here, before anything is sent, what efis would refuse.
 
-The codes below are efis's published contract (TransportDocumentRequest, TransportPlaceInput),
-not a list chosen here. Which Odoo transfer gets which transaction is the business's choice, on
-each operation type, with no default: it is still a working guess for the accountant (DEV-2441).
+DEV-2430: the same transfer may instead go as a transport invoice (registerTI), for goods sent to
+another person for processing, examination or repair with no change of owner. It is the same
+request with a receiver, its own transactions, and narrower kinds of place.
+
+The codes below are efis's published contract (TransportDocumentRequest, TransportInvoiceRequest,
+TransportPlaceInput), not a list chosen here. Which Odoo transfer gets which document and
+transaction is the business's choice, on each operation type, with no default: it is still a
+working guess for the accountant (DEV-2441) and the helpdesk (DEV-2036).
 """
 
 import re
 
 from odoo.addons.metanow_fiscalization.efis import money
 
+# The two documents a transfer can issue.
+TRANSFER_NOTE = "wtn"
+TRANSPORT_INVOICE = "ti"
+
 TRANSACTIONS = ("TRANSFER", "DOOR", "SALES", "EXAMINATION")
 # Where goods may go; where they may leave from adds another person's warehouse and customs.
 DESTINATION_KINDS = ("WAREHOUSE", "EXHIBITION", "STORE", "SALE", "OTHER")
 ORIGIN_KINDS = DESTINATION_KINDS + ("ANOTHER", "CUSTOMS")
 VEHICLE_OWNERSHIPS = ("OWNER", "THIRDPARTY")
+
+# DEV-2430: a transport invoice's (TransportInvoiceRequest; TIStartPointSType, TIDestinPointSType).
+TI_TRANSACTIONS = ("PROCESSING", "EXAMINATION", "REPAIR")
+TI_KINDS = ("WAREHOUSE", "EXHIBITION", "STORE", "OTHER")
+
+RULES = {
+    TRANSFER_NOTE: {"transactions": TRANSACTIONS, "origins": ORIGIN_KINDS, "destinations": DESTINATION_KINDS},
+    TRANSPORT_INVOICE: {"transactions": TI_TRANSACTIONS, "origins": TI_KINDS, "destinations": TI_KINDS},
+}
 
 # CLAUDE.md: an explicit numeric offset and whole seconds, never milliseconds.
 _TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$")
@@ -38,15 +56,16 @@ def _text(value):
     return text or None
 
 
-def build(note, config):
+def build(note, config, kind=TRANSFER_NOTE):
     """Return the request body, or raise TransportInvalid with every problem found."""
+    rules = RULES[kind]
     problems = []
 
     transaction = _text(note.get("transaction"))
-    if transaction not in TRANSACTIONS:
+    if transaction not in rules["transactions"]:
         problems.append(
-            "Lloji i operacionit nuk ka transaksion për faturën shoqëruese; zgjidheni te lloji i operacionit. "
-            "/ The operation type has no transaction for the transfer note; choose it on the operation type.")
+            "Lloji i operacionit nuk ka transaksion për këtë dokument; zgjidheni te lloji i operacionit. "
+            "/ The operation type has no transaction for this document; choose it on the operation type.")
 
     for key, label in (
         ("business_unit_code", "Magazina nuk ka kod të njësisë së biznesit. / The warehouse has no business unit code."),
@@ -75,9 +94,21 @@ def build(note, config):
     if ownership not in VEHICLE_OWNERSHIPS:
         problems.append("Zgjidhni kujt i përket mjeti. / Choose whom the vehicle belongs to.")
 
-    origin, origin_problems = _place(note.get("from"), ORIGIN_KINDS, "Nisja / Origin")
-    destination, destination_problems = _place(note.get("to"), DESTINATION_KINDS, "Destinacioni / Destination")
+    origin, origin_problems = _place(note.get("from"), rules["origins"], "Nisja / Origin")
+    destination, destination_problems = _place(note.get("to"), rules["destinations"], "Destinacioni / Destination")
     problems.extend(origin_problems + destination_problems)
+
+    receiver = None
+    if kind == TRANSPORT_INVOICE:
+        # Optional in efis's contract; required here, as efis's console and Self-Care require it:
+        # a transport invoice names whom the goods go to.
+        given = note.get("receiver") or {}
+        receiver = {"taxId": _text(given.get("tax_id")), "name": _text(given.get("name")),
+                    "address": _text(given.get("address")), "town": _text(given.get("town"))}
+        if not all(receiver.values()):
+            problems.append(
+                "Marrësi ka nevojë për numër tatimor, emër, adresë dhe qytet. "
+                "/ The receiver needs a tax number, a name, an address and a town.")
 
     issuer = note.get("issuer") or {}
     issuer_body = {"name": _text(issuer.get("name")), "address": _text(issuer.get("address")), "town": _text(issuer.get("town"))}
@@ -90,7 +121,7 @@ def build(note, config):
         # buyer, a note with another carrier is issued from efis's console.
         problems.append(
             "Një transportues tjetër nga kompania nuk mbështetet ende nga Odoo; lëshojeni faturën shoqëruese nga efis. "
-            "/ A carrier other than the company is not supported from Odoo yet; issue the transfer note from efis.")
+            "/ A carrier other than the company is not supported from Odoo yet; issue the document from efis.")
 
     goods = []
     for number, item in enumerate(note.get("goods") or [], start=1):
@@ -117,7 +148,7 @@ def build(note, config):
     if problems:
         raise TransportInvalid(problems)
 
-    return {
+    body = {
         "transaction": transaction,
         "businessUnitCode": _text(config.get("business_unit_code")),
         "operatorCode": _text(config.get("operator_code")),
@@ -134,6 +165,9 @@ def build(note, config):
         "carrier": None,
         "goods": goods,
     }
+    if kind == TRANSPORT_INVOICE:
+        body["receiver"] = receiver
+    return body
 
 
 def _place(place, kinds, label):

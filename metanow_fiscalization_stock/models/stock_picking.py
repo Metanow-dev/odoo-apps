@@ -8,6 +8,7 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 from odoo.addons.metanow_fiscalization.efis import client as efis_client
+from odoo.addons.metanow_fiscalization.efis import inbound as efis_inbound
 
 from ..efis import transport
 from .stock_warehouse import PLACE_KINDS
@@ -41,12 +42,25 @@ NOTE_FIELDS = (
 )
 BATCH = 50
 
+# DEV-2430: the two documents, each with its own efis route and list. The fields below hold
+# whichever one the transfer issued; metanow_fiscal_transport_kind says which.
+DOCUMENT_KINDS = [
+    (transport.TRANSFER_NOTE, "Faturë shoqëruese / Transfer note"),
+    (transport.TRANSPORT_INVOICE, "Faturë transporti / Transport invoice"),
+]
+ROUTES = {
+    transport.TRANSFER_NOTE: ("submit_transport_document", "list_transport_documents", "transportDocuments"),
+    transport.TRANSPORT_INVOICE: ("submit_transport_invoice", "list_transport_invoices", "transportInvoices"),
+}
+
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
     metanow_fiscal_wtn_state = fields.Selection(
-        WTN_STATES, string="Fatura shoqëruese / Transfer note", copy=False, readonly=True, index=True)
+        WTN_STATES, string="Dokumenti i transportit / Transport document", copy=False, readonly=True, index=True)
+    metanow_fiscal_transport_kind = fields.Selection(
+        DOCUMENT_KINDS, string="Lloji i dokumentit / Kind of document", copy=False, readonly=True)
     metanow_fiscal_wtn_document_id = fields.Char(string="Dokumenti në efis / efis document", copy=False, readonly=True)
     metanow_fiscal_wtn_number = fields.Char(string="Numri / Number", copy=False, readonly=True)
     metanow_fiscal_wtn_security_code = fields.Char(
@@ -73,12 +87,23 @@ class StockPicking(models.Model):
         "res.partner", string="Transportuesi / Carrier", copy=False,
         help="Bosh kur transporton vetë kompania. / Empty when the company carries the goods itself.")
     metanow_fiscal_wtn_applies = fields.Boolean(compute="_compute_metanow_fiscal_wtn_applies")
+    # Which document a press of the button issues: the one already issued, or the operation type's.
+    metanow_fiscal_transport_document = fields.Selection(DOCUMENT_KINDS, compute="_compute_metanow_fiscal_wtn_applies")
 
-    @api.depends("picking_type_id.metanow_fiscal_wtn_transaction", "company_id.metanow_fiscal_enabled")
+    @api.depends("picking_type_id.metanow_fiscal_wtn_transaction", "picking_type_id.metanow_fiscal_ti_transaction",
+                 "company_id.metanow_fiscal_enabled", "company_id.metanow_fiscal_ti_enabled", "metanow_fiscal_transport_kind")
     def _compute_metanow_fiscal_wtn_applies(self):
         for picking in self:
-            picking.metanow_fiscal_wtn_applies = bool(
-                picking.company_id.metanow_fiscal_enabled and picking.picking_type_id.metanow_fiscal_wtn_transaction)
+            kind, _ = picking._metanow_fiscal_document()
+            picking.metanow_fiscal_transport_document = kind or False
+            picking.metanow_fiscal_wtn_applies = bool(picking.company_id.metanow_fiscal_enabled and kind)
+
+    def _metanow_fiscal_document(self):
+        """(kind, transaction) this transfer issues, or (None, None)."""
+        self.ensure_one()
+        if not self.picking_type_id:
+            return None, None
+        return self.picking_type_id._metanow_fiscal_document(self.company_id)
 
     # ------------------------------------------------------------------ the note's content
 
@@ -97,6 +122,7 @@ class StockPicking(models.Model):
         """The transfer as plain values for the request body builder."""
         self.ensure_one()
         company = self.company_id
+        _, transaction = self._metanow_fiscal_document()
         source = self._metanow_fiscal_source_warehouse()
         origin = dict(self._metanow_fiscal_address(source.partner_id), kind=source.metanow_fiscal_place_kind) if source else {}
         target = self.location_dest_id.warehouse_id
@@ -124,8 +150,9 @@ class StockPicking(models.Model):
             # DEV-2441 working guess (Gleni, 11 Nov 2026): the goods are valued at cost.
             in_product_unit = unit._compute_quantity(quantity, move.product_id.uom_id) if unit else quantity
             value += in_product_unit * move.product_id.standard_price
+        receiver = self.partner_id.commercial_partner_id if self.partner_id else None
         return {
-            "transaction": self.picking_type_id.metanow_fiscal_wtn_transaction,
+            "transaction": transaction,
             "issued_at": issued_at,
             "value_of_goods": company.currency_id.round(value),
             "vehicle_plates": self.metanow_fiscal_vehicle_plates,
@@ -137,6 +164,13 @@ class StockPicking(models.Model):
             "issuer": {"name": company.name, "address": " ".join(p for p in (company.street, company.street2) if p) or None,
                        "town": company.city},
             "carrier": {"name": carrier.name} if carrier else None,
+            # DEV-2430: whom a transport invoice's goods go to (the transfer's partner).
+            "receiver": {
+                "tax_id": efis_inbound.tax_id(receiver.vat) if receiver and receiver.vat else None,
+                "name": receiver.name if receiver else None,
+                "address": " ".join(p for p in (receiver.street, receiver.street2) if p) if receiver else None,
+                "town": receiver.city if receiver else None,
+            },
             "goods": goods,
         }
 
@@ -151,13 +185,13 @@ class StockPicking(models.Model):
             "software_code": company.metanow_fiscal_software_code,
         }
 
-    def _metanow_fiscal_wtn_body(self, issued_at):
+    def _metanow_fiscal_wtn_body(self, issued_at, kind):
         self.ensure_one()
         try:
-            body = transport.build(self._metanow_fiscal_wtn_note(issued_at), self._metanow_fiscal_wtn_config())
+            body = transport.build(self._metanow_fiscal_wtn_note(issued_at), self._metanow_fiscal_wtn_config(), kind)
         except transport.TransportInvalid as error:
             raise UserError(
-                f"{self.name}: efis nuk do ta pranonte këtë faturë shoqëruese. / efis would not accept this transfer note.\n"
+                f"{self.name}: efis nuk do ta pranonte këtë dokument transporti. / efis would not accept this transport document.\n"
                 + "\n".join(error.problems)) from error
         registry = self.company_id._metanow_fiscal_registry()
         problems = registry.unconfirmed(body) if registry is not None else []
@@ -181,20 +215,23 @@ class StockPicking(models.Model):
         """
         for picking in self:
             if not picking.metanow_fiscal_wtn_applies:
-                raise UserError(f"{picking.name}: ky operacion nuk lëshon faturë shoqëruese. "
-                                "/ This operation issues no transfer note.")
+                raise UserError(f"{picking.name}: ky operacion nuk lëshon dokument transporti. "
+                                "/ This operation issues no transport document.")
             if picking.metanow_fiscal_wtn_state in HELD:
-                raise UserError(f"{picking.name}: fatura shoqëruese është lëshuar tashmë. / The transfer note has already been issued.")
+                raise UserError(f"{picking.name}: dokumenti i transportit është lëshuar tashmë. "
+                                "/ The transport document has already been issued.")
             if picking.metanow_fiscal_wtn_request and picking._metanow_fiscal_wtn_adopt():
-                continue  # efis had numbered the earlier one: it is the note.
+                continue  # efis had numbered the earlier one: it is the document.
+            kind, _ = picking._metanow_fiscal_document()
             issued_at = self._metanow_fiscal_now()
-            body = picking._metanow_fiscal_wtn_body(issued_at)
+            body = picking._metanow_fiscal_wtn_body(issued_at, kind)
             attempt = (picking.metanow_fiscal_wtn_attempt or 0) + 1
             database = self.env["ir.config_parameter"].sudo().get_str("database.uuid") or "db"
             picking.write({
+                "metanow_fiscal_transport_kind": kind,
                 "metanow_fiscal_wtn_state": "to_send",
                 "metanow_fiscal_wtn_attempt": attempt,
-                "metanow_fiscal_wtn_key": f"odoo-{database}-wtn-{picking.id}-{attempt}",
+                "metanow_fiscal_wtn_key": f"odoo-{database}-{kind}-{picking.id}-{attempt}",
                 "metanow_fiscal_wtn_request": json.dumps(body, ensure_ascii=False, sort_keys=True),
                 "metanow_fiscal_wtn_issued_at": issued_at,
                 "metanow_fiscal_wtn_error": False,
@@ -207,18 +244,20 @@ class StockPicking(models.Model):
         came back)? It is found by its issue time and business unit, the note's own identity."""
         self.ensure_one()
         earlier = json.loads(self.metanow_fiscal_wtn_request)
+        _, list_route, list_key = ROUTES[self.metanow_fiscal_transport_kind or transport.TRANSFER_NOTE]
         try:
-            listing = self.company_id._metanow_fiscal_client().list_transport_documents()
+            listing = getattr(self.company_id._metanow_fiscal_client(), list_route)()
         except efis_client.EfisUnavailable as error:
             raise UserError(f"efis nuk u përgjigj; provoni përsëri. / efis did not answer; try again. ({error})") from error
         if listing.status != 200:
             raise UserError(f"efis nuk i dha faturat shoqëruese ({listing.status}). / efis did not list the transfer notes ({listing.status}).")
-        notes = [note for note in (listing.body or {}).get("transportDocuments") or []
+        notes = [note for note in (listing.body or {}).get(list_key) or []
                  if note.get("businessUnitCode") == earlier.get("businessUnitCode")
                  and _same_moment(note.get("issuedAt"), earlier.get("issuedAt"))]
         # Two transfers issued from one unit in the same second share both, so a note another
         # transfer already holds is not this one's.
         held = set(self.sudo().search([("metanow_fiscal_wtn_document_id", "in", [note.get("id") for note in notes]),
+                                       ("metanow_fiscal_transport_kind", "=", self.metanow_fiscal_transport_kind),
                                        ("id", "!=", self.id)]).mapped("metanow_fiscal_wtn_document_id"))
         candidates = [note for note in notes if note.get("id") not in held]
         if len(candidates) > 1:
@@ -250,7 +289,8 @@ class StockPicking(models.Model):
             return
         try:
             client = self.company_id._metanow_fiscal_client()
-            answer = client.submit_transport_document(json.loads(self.metanow_fiscal_wtn_request), self.metanow_fiscal_wtn_key)
+            submit_route, _, _ = ROUTES[self.metanow_fiscal_transport_kind or transport.TRANSFER_NOTE]
+            answer = getattr(client, submit_route)(json.loads(self.metanow_fiscal_wtn_request), self.metanow_fiscal_wtn_key)
         except efis_client.EfisUnavailable as error:
             # No answer. The next pass resends the same body under the same key.
             self.write({"metanow_fiscal_wtn_error": f"efis_unavailable: {error}"})
@@ -265,7 +305,11 @@ class StockPicking(models.Model):
                 self._metanow_fiscal_trigger("metanow_fiscalization_stock.ir_cron_metanow_fiscal_wtn_poll")
             return
         code = body.get("code") or str(answer.status)
-        if answer.status >= 500 or answer.status == 429:
+        if code == "transport_invoices_disabled":
+            # The deployment has them switched off: no number was spent, and resending changes nothing.
+            self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error":
+                        "efis nuk lëshon ende fatura transporti. / efis does not issue transport invoices yet."})
+        elif answer.status >= 500 or answer.status == 429:
             self.write({"metanow_fiscal_wtn_error": f"efis: {code}"})  # efis's trouble: sent again
         elif code in ("issued_at_not_today", "idempotency_key_reused"):
             # Not issued today, or the key names another note: a person issues it again, and the
@@ -285,21 +329,28 @@ class StockPicking(models.Model):
         pickings = self.search([("metanow_fiscal_wtn_state", "in", list(POLLED)),
                                 ("metanow_fiscal_wtn_document_id", "!=", False)], order="id", limit=BATCH)
         for company in pickings.company_id:
-            try:
-                listing = company._metanow_fiscal_client().list_transport_documents()
-            except (efis_client.EfisUnavailable, UserError) as error:
-                _logger.info("efis transfer notes not read for company %s: %s", company.id, error)
-                continue
-            if listing.status != 200:
-                continue
-            notes = {note.get("id"): note for note in (listing.body or {}).get("transportDocuments") or []}
-            for picking in pickings.filtered(lambda p: p.company_id == company):
-                note = notes.get(picking.metanow_fiscal_wtn_document_id)
-                if note and picking._metanow_fiscal_lock():
-                    values = {name: value for name, value in transport.answer_values(note).items()
-                              if (picking[name] or False) != (value or False)}
-                    if values:
-                        picking.write(values)
+            for kind, (_, list_route, list_key) in ROUTES.items():
+                group = pickings.filtered(lambda p: p.company_id == company and (p.metanow_fiscal_transport_kind or transport.TRANSFER_NOTE) == kind)
+                if group:
+                    self._metanow_fiscal_wtn_follow(company, group, list_route, list_key)
+
+    @api.model
+    def _metanow_fiscal_wtn_follow(self, company, pickings, list_route, list_key):
+        try:
+            listing = getattr(company._metanow_fiscal_client(), list_route)()
+        except (efis_client.EfisUnavailable, UserError) as error:
+            _logger.info("efis transport documents not read for company %s: %s", company.id, error)
+            return
+        if listing.status != 200:
+            return
+        notes = {note.get("id"): note for note in (listing.body or {}).get(list_key) or []}
+        for picking in pickings:
+            note = notes.get(picking.metanow_fiscal_wtn_document_id)
+            if note and picking._metanow_fiscal_lock():
+                values = {name: value for name, value in transport.answer_values(note).items()
+                          if (picking[name] or False) != (value or False)}
+                if values:
+                    picking.write(values)
 
     # ------------------------------------------------------------------ guards
 

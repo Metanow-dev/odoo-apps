@@ -28,13 +28,15 @@ GET_INBOUND_PDF = ("GET", "/v1/einvoices/inbound/{id}/pdf")
 DECIDE_INBOUND = ("POST", "/v1/einvoices/inbound/{id}/decision")
 SUBMIT_TRANSPORT_DOCUMENT = ("POST", "/v1/transport-documents")
 LIST_TRANSPORT_DOCUMENTS = ("GET", "/v1/transport-documents")
+SUBMIT_TRANSPORT_INVOICE = ("POST", "/v1/transport-invoices")
+LIST_TRANSPORT_INVOICES = ("GET", "/v1/transport-invoices")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
     LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
-    SUBMIT_TRANSPORT_DOCUMENT, LIST_TRANSPORT_DOCUMENTS,
+    SUBMIT_TRANSPORT_DOCUMENT, LIST_TRANSPORT_DOCUMENTS, SUBMIT_TRANSPORT_INVOICE, LIST_TRANSPORT_INVOICES,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -157,6 +159,15 @@ class EfisClient:
 
     def list_transport_documents(self):
         return self._call(LIST_TRANSPORT_DOCUMENTS, {})
+
+    # DEV-2430: the transport invoice, for the same add-on.
+    def submit_transport_invoice(self, invoice, idempotency_key):
+        if not idempotency_key:
+            raise ValueError("A transport invoice is never sent without an idempotency key.")
+        return self._call(SUBMIT_TRANSPORT_INVOICE, {}, body=invoice, headers={"Idempotency-Key": idempotency_key})
+
+    def list_transport_invoices(self):
+        return self._call(LIST_TRANSPORT_INVOICES, {})
 
     def get_registry(self):
         return self._call(GET_REGISTRY, {})

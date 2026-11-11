@@ -74,6 +74,8 @@ FROZEN_STOCK_XML_IDS = {
     "view_picking_type_form_metanow_fiscal",
     "view_picking_form_metanow_fiscal",
     "report_delivery_document_metanow_fiscal",
+    # DEV-2430: the transport invoice switch in Settings.
+    "res_config_settings_view_form_metanow_fiscal_stock",
 }
 
 

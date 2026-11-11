@@ -7,7 +7,9 @@
         <field name="inherit_id" ref="stock.view_picking_type_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='sequence_code']" position="after">
-                <field name="metanow_fiscal_wtn_transaction"/>
+                <field name="metanow_fiscal_wtn_transaction" invisible="metanow_fiscal_ti_transaction"/>
+                <!-- DEV-2430: or a transport invoice; never both. -->
+                <field name="metanow_fiscal_ti_transaction" invisible="metanow_fiscal_wtn_transaction"/>
             </xpath>
         </field>
     </record>

@@ -104,7 +104,7 @@ class BuildTests(unittest.TestCase):
     def test_a_carrier_other_than_the_company_is_issued_from_efis_for_now(self):
         with self.assertRaises(transport.TransportInvalid) as raised:
             build(carrier={"name": "Transport sh.p.k."})
-        self.assertIn("issue the transfer note from efis", str(raised.exception))
+        self.assertIn("issue the document from efis", str(raised.exception))
 
     def test_goods_need_a_name_a_unit_and_a_positive_quantity(self):
         with self.assertRaises(transport.TransportInvalid):
@@ -130,6 +130,61 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(transport.DESTINATION_KINDS, ("WAREHOUSE", "EXHIBITION", "STORE", "SALE", "OTHER"))
         self.assertEqual(transport.ORIGIN_KINDS[-2:], ("ANOTHER", "CUSTOMS"))
         self.assertEqual(transport.VEHICLE_OWNERSHIPS, ("OWNER", "THIRDPARTY"))
+
+
+RECEIVER = {"tax_id": "M11111111M", "name": "Riparime sh.p.k.", "address": "Rruga 5", "town": "Elbasan"}
+
+
+def build_ti(**overrides):
+    values = {"transaction": "REPAIR", "receiver": RECEIVER}
+    values.update(overrides)
+    config = dict(CONFIG, **values.pop("config", {}))
+    return transport.build(note(**values), config, transport.TRANSPORT_INVOICE)
+
+
+class TransportInvoiceTests(unittest.TestCase):
+    """DEV-2430: the same transfer as a transport invoice."""
+
+    def test_goods_sent_for_repair(self):
+        body = build_ti()
+        self.assertEqual(body["transaction"], "REPAIR")
+        self.assertEqual(body["receiver"], {"taxId": "M11111111M", "name": "Riparime sh.p.k.", "address": "Rruga 5", "town": "Elbasan"})
+
+    def test_every_key_is_one_efis_publishes(self):
+        schemas = support.openapi()["components"]["schemas"]
+        body = build_ti()
+        self.assertEqual(set(body), set(schemas["TransportInvoiceRequest"]["properties"]))
+        self.assertEqual(set(body["receiver"]), set(schemas["TransportReceiverInput"]["properties"]))
+
+    def test_a_transfer_note_carries_no_receiver(self):
+        self.assertNotIn("receiver", build())
+
+    def test_only_a_transport_invoice_s_transactions(self):
+        for transaction in ("PROCESSING", "EXAMINATION", "REPAIR"):
+            self.assertEqual(build_ti(transaction=transaction)["transaction"], transaction)
+        for transaction in ("TRANSFER", "SALES", None):
+            with self.assertRaises(transport.TransportInvalid, msg=transaction):
+                build_ti(transaction=transaction)
+        with self.assertRaises(transport.TransportInvalid, msg="a transfer note never takes REPAIR"):
+            build(transaction="REPAIR")
+
+    def test_places_are_narrower_than_a_transfer_note_s(self):
+        for kind in ("SALE", "ANOTHER", "CUSTOMS"):
+            with self.assertRaises(transport.TransportInvalid, msg=kind):
+                build_ti(**{"from": {"address": "Rruga 1", "city": "Tiranë", "kind": kind}})
+        with self.assertRaises(transport.TransportInvalid):
+            build_ti(to={"address": "Rruga 5", "city": "Elbasan", "kind": "SALE"})
+        self.assertEqual(build_ti(to={"address": "Rruga 5", "city": "Elbasan", "kind": "OTHER"})["to"]["kind"], "OTHER")
+
+    def test_the_receiver_is_required_whole(self):
+        for receiver in (None, dict(RECEIVER, tax_id=None), dict(RECEIVER, town="")):
+            with self.assertRaises(transport.TransportInvalid, msg=repr(receiver)) as raised:
+                build_ti(receiver=receiver)
+            self.assertIn("receiver needs a tax number", str(raised.exception))
+
+    def test_the_codes_are_efis_published_ones(self):
+        self.assertEqual(transport.TI_TRANSACTIONS, ("PROCESSING", "EXAMINATION", "REPAIR"))
+        self.assertEqual(transport.TI_KINDS, ("WAREHOUSE", "EXHIBITION", "STORE", "OTHER"))
 
 
 class AnswerTests(unittest.TestCase):
