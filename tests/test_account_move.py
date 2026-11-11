@@ -116,9 +116,16 @@ class PostingTests(unittest.TestCase):
             record._post()
         self.assertEqual(record.writes, [])
 
-    def test_a_credit_note_is_refused_while_fiscalisation_is_on(self):
+    def test_a_credit_note_with_no_original_is_refused_before_posting(self):
         env = environment()
-        record = move(env, company(env), move_type="out_refund")
+        record = move(env, company(env), move_type="out_refund", reversed_entry_id=False)
+        with self.assertRaises(fake_odoo.UserError):
+            record._post()
+        self.assertNotIn("_post", record.base_calls)
+
+    def test_a_receipt_is_refused_while_fiscalisation_is_on(self):
+        env = environment()
+        record = move(env, company(env), move_type="out_receipt")
         with self.assertRaises(fake_odoo.UserError):
             record._post()
         self.assertNotIn("_post", record.base_calls)

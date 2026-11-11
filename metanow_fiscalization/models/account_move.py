@@ -21,10 +21,22 @@ FISCAL_STATES = [
     (outcome.PARKED, "Në pritje të veprimit / Waiting for action"),
 ]
 
-FISCALISED_TYPES = ("out_invoice",)
-# Posted through efis's corrective flow, which this module does not drive yet. They are refused
-# while fiscalisation is on, never posted unfiscalised.
-UNSUPPORTED_TYPES = ("out_refund", "out_receipt")
+FISCALISED_TYPES = ("out_invoice", "out_refund")
+# Not fiscalised by this module yet. Refused while fiscalisation is on, never posted unfiscalised.
+UNSUPPORTED_TYPES = ("out_receipt",)
+CREDIT_NOTE = "out_refund"
+
+# DEV-2431: what a credit note is, chosen by the person (nothing is preselected). Odoo uses one
+# credit note both to fix a mistake and to record a return or a discount; the authority keeps
+# the two apart.
+CORRECTION_KINDS = [
+    (efis_payload.CORRECTIVE, "Gabim në faturë / Mistake on the invoice"),
+    (efis_payload.CREDIT, "Kthim ose zbritje / Return or discount"),
+]
+
+# The states of an invoice efis has registered with the authority, which a credit note may
+# reverse. A superseded invoice was corrected before, and may be credited again.
+CORRECTABLE_STATES = (outcome.REGISTERED, outcome.SUPERSEDED)
 
 BATCH = 50
 
@@ -70,6 +82,12 @@ class AccountMove(models.Model):
     # carries the same code.
     metanow_fiscal_operator_code = fields.Char(
         string="Kodi i operatorit / Operator code", copy=False, readonly=True)
+    metanow_fiscal_correction_kind = fields.Selection(
+        CORRECTION_KINDS,
+        string="Nota e kreditit për efis / Credit note for efis",
+        copy=False,
+        help="Gabim në faturë: fatura kishte të dhëna të gabuara. Kthim ose zbritje: një rregullim i mëvonshëm. "
+             "/ Mistake on the invoice: the invoice had wrong data. Return or discount: a later adjustment.")
 
     @api.depends("metanow_fiscal_verification_url")
     def _compute_metanow_fiscal_qr_src(self):
@@ -86,9 +104,10 @@ class AccountMove(models.Model):
         for move in self:
             if move.company_id.metanow_fiscal_enabled and move.move_type in UNSUPPORTED_TYPES:
                 raise UserError(
-                    "Notat e kreditit dhe faturat e arkës nuk fiskalizohen ende nga ky modul; "
-                    "lëshoni korrigjimin nga efis. / Credit notes and receipts are not fiscalised by this "
-                    "module yet; issue the correction from efis.")
+                    "Faturat e arkës nuk fiskalizohen ende nga ky modul. "
+                    "/ Receipts are not fiscalised by this module yet.")
+            if move._metanow_fiscal_applies() and move.move_type == CREDIT_NOTE:
+                move._metanow_fiscal_check_credit_note()
         posted = super()._post(soft)
         queued = False
         for move in posted:
@@ -110,6 +129,25 @@ class AccountMove(models.Model):
         if queued:
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_send")
         return posted
+
+    def _metanow_fiscal_check_credit_note(self):
+        """Refuse, before anything is posted, a credit note efis could not register as a correction."""
+        self.ensure_one()
+        original = self.reversed_entry_id
+        if not original:
+            raise UserError(
+                f"{self.name}: nota e kreditit nuk i referohet asnjë fature; krijojeni nga fatura me \"Notë krediti\". "
+                "/ The credit note refers to no invoice; create it from the invoice with \"Credit note\".")
+        if (original.metanow_fiscal_state not in CORRECTABLE_STATES
+                or not original.metanow_fiscal_security_code or not original.metanow_fiscal_issued_at):
+            raise UserError(
+                f"{self.name}: fatura {original.name} nuk është regjistruar nga efis, prandaj nuk korrigjohet ende. "
+                f"/ The invoice {original.name} has not been registered by efis, so it cannot be corrected yet.")
+        if not self.metanow_fiscal_correction_kind:
+            raise UserError(
+                f"{self.name}: zgjidhni nëse nota e kreditit korrigjon një gabim në faturë apo regjistron një kthim "
+                "ose zbritje. / Choose whether the credit note corrects a mistake on the invoice or records a "
+                "return or discount.")
 
     def _metanow_fiscal_key(self, attempt):
         self.ensure_one()
@@ -161,7 +199,9 @@ class AccountMove(models.Model):
         # company's account the invoice is paid into (the invoice's recipient bank); only an IBAN
         # is sent. delivery_date is read only where this Odoo has the field.
         bank = None
-        account = self.partner_bank_id
+        # On a credit note, Odoo's partner bank is the customer's account the refund is paid to,
+        # never an account to pay into, so it is not sent.
+        account = self.partner_bank_id if self.move_type != CREDIT_NOTE else None
         if account and account.acc_type == "iban":
             bank = {
                 "iban": account.acc_number,
@@ -169,12 +209,22 @@ class AccountMove(models.Model):
                 "holder": account.acc_holder_name or None,
             }
         delivered = getattr(self, "delivery_date", False)
+        corrects = None
+        if self.move_type == CREDIT_NOTE:
+            original = self.reversed_entry_id
+            corrects = {
+                "security_code": original.metanow_fiscal_security_code if original else None,
+                "issued_at": original.metanow_fiscal_issued_at if original else None,
+                "kind": self.metanow_fiscal_correction_kind,
+                "electronic": bool(original.metanow_fiscal_electronic) if original else False,
+            }
         return {
             "reference": self.name,
             "due_date": self.invoice_date_due.isoformat() if self.invoice_date_due else None,
             "customer_reference": self.ref or None,
             "delivery_date": delivered.isoformat() if delivered else None,
             "bank": bank,
+            "corrects": corrects,
             "currency": self.currency_id.name,
             "company_currency": self.company_id.currency_id.name,
             "amount_total": self.amount_total,
@@ -393,6 +443,12 @@ class AccountMove(models.Model):
         return super().unlink()
 
     def write(self, vals):
+        if "metanow_fiscal_correction_kind" in vals:
+            for move in self:
+                if move._metanow_fiscal_locked() and vals["metanow_fiscal_correction_kind"] != move.metanow_fiscal_correction_kind:
+                    raise UserError(
+                        f"{move.name}: nota e kreditit është dërguar te efis dhe lloji i saj nuk ndryshohet. "
+                        "/ The credit note has been sent to efis and its kind is never changed.")
         changing = [name for name in outcome.WRITE_ONCE if name in vals]
         if changing:
             for move in self:
