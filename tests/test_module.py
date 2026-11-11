@@ -54,6 +54,8 @@ FROZEN_XML_IDS = {
     "view_partner_form_metanow_fiscal",
     "view_country_form_metanow_fiscal",
     "report_invoice_document_metanow_fiscal",
+    # DEV-2436: the operator code on the user form.
+    "view_users_form_metanow_fiscal",
 }
 
 
@@ -106,7 +108,7 @@ class InvariantTests(unittest.TestCase):
     def test_the_odoo_free_layer_imports_without_odoo(self):
         script = (
             "import sys; sys.path.insert(0, sys.argv[1]);"
-            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr;"
+            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry;"
             "assert 'odoo' not in sys.modules"
         )
         subprocess.run([sys.executable, "-I", "-c", script, str(MODULE)], check=True)

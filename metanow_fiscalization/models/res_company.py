@@ -1,8 +1,13 @@
-from odoo import fields, models
-from odoo.exceptions import UserError
+import logging
+
+from odoo import api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
 from ..efis import client as efis_client
+from ..efis import registry as efis_registry
 from ..efis.profile import Profile
+
+_logger = logging.getLogger(__name__)
 
 # The company's efis connection. The credential is what pairing returned for this one tenant:
 # revocable in efis, readable only by Settings administrators here, and never a certificate
@@ -11,6 +16,14 @@ PAIRING_FIELDS = (
     "metanow_fiscal_credential",
     "metanow_fiscal_tenant",
     "metanow_fiscal_channel",
+)
+
+# DEV-2436: the company's codes, each of the kind efis's registry confirms it under.
+COMPANY_CODES = (
+    ("metanow_fiscal_business_unit_code", efis_registry.BUSINESS_UNIT),
+    ("metanow_fiscal_operator_code", efis_registry.OPERATOR),
+    ("metanow_fiscal_software_code", efis_registry.SOFTWARE),
+    ("metanow_fiscal_device_code", efis_registry.DEVICE),
 )
 
 
@@ -68,6 +81,29 @@ class ResCompany(models.Model):
         copy=False,
         readonly=True,
     )
+    metanow_fiscal_registry = fields.Text(
+        string="Kodet e konfirmuara në efis / Codes confirmed in efis",
+        copy=False,
+        readonly=True,
+    )
+
+    @api.constrains(*(name for name, _ in COMPANY_CODES))
+    def _check_metanow_fiscal_codes(self):
+        # Only a code efis has confirmed may be chosen. Before the company has read its registry
+        # from efis there is nothing to check against; posting checks again (account_move).
+        for company in self:
+            registry = company._metanow_fiscal_registry()
+            if registry is None:
+                continue
+            problems = [
+                f"{efis_registry.LABELS[kind]}: {company[name]}"
+                for name, kind in COMPANY_CODES
+                if company[name] and not registry.confirms(kind, company[name])
+            ]
+            if problems:
+                raise ValidationError(
+                    "Këto kode nuk janë konfirmuar në efis. / These codes are not confirmed in efis.\n"
+                    + "\n".join(problems))
 
     def _metanow_fiscal_client(self, authenticated=True):
         self.ensure_one()
@@ -106,7 +142,50 @@ class ResCompany(models.Model):
             "metanow_fiscal_channel": body.get("channel") or False,
         })
         self._metanow_fiscal_refresh_profile()
+        # The codes are read too, so they can be chosen at once. Pairing has succeeded by now,
+        # so a failed read does not undo it: "Check the configuration" reads them again.
+        try:
+            self._metanow_fiscal_refresh_registry()
+        except UserError as error:
+            _logger.warning("efis registry not read after pairing company %s: %s", self.id, error)
         return True
+
+    def _metanow_fiscal_refresh_registry(self):
+        """Read the codes efis has confirmed for this business, and keep them on the company."""
+        self.ensure_one()
+        try:
+            response = self._metanow_fiscal_client().get_registry()
+        except efis_client.EfisUnavailable as error:
+            raise UserError(f"efis nuk u përgjigj. / efis did not answer. ({error})") from error
+        if response.status != 200:
+            raise UserError(
+                f"efis nuk i dha kodet e regjistruara ({response.status}). "
+                f"/ efis did not return the registered codes ({response.status}).")
+        try:
+            registry = efis_registry.Registry(response.body)
+        except ValueError as error:
+            raise UserError("efis ktheu kode të palexueshme. / efis returned unreadable codes.") from error
+        self.write({"metanow_fiscal_registry": registry.to_json()})
+        return registry
+
+    def _metanow_fiscal_registry(self):
+        self.ensure_one()
+        try:
+            return efis_registry.Registry.from_json(self.metanow_fiscal_registry)
+        except ValueError:
+            return None
+
+    @api.model
+    def _metanow_fiscal_choices(self, kind):
+        """The confirmed codes of one kind, for a pick list. Every company the user is working in
+        counts, so a record of any of them shows its code; each record's own company is checked
+        when it is saved."""
+        codes = set()
+        for company in self.env.companies:
+            registry = company._metanow_fiscal_registry()
+            if registry is not None:
+                codes.update(registry.codes[kind])
+        return [(code, code) for code in sorted(codes)]
 
     def _metanow_fiscal_refresh_profile(self):
         self.ensure_one()

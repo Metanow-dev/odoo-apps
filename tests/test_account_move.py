@@ -10,6 +10,7 @@ from metanow_fiscalization.efis.client import EfisClient
 from metanow_fiscalization.models.account_move import AccountMove
 from metanow_fiscalization.models.res_company import ResCompany
 from metanow_fiscalization.models.res_config_settings import ResConfigSettings
+from metanow_fiscalization.models.res_users import ResUsers
 
 FISCAL_FIELDS = {
     outcome.DOCUMENT_ID, outcome.STATE, outcome.EFIS_STATE, outcome.FISCAL_NUMBER,
@@ -71,7 +72,7 @@ def move(env, owner, **overrides):
         move_type="out_invoice",
         company_id=owner,
         currency_id=SimpleNamespace(name="ALL"),
-        journal_id=SimpleNamespace(metanow_fiscal_payment_method="ACCOUNT"),
+        journal_id=SimpleNamespace(metanow_fiscal_payment_method="ACCOUNT", metanow_fiscal_device_code=False),
         commercial_partner_id=SimpleNamespace(
             name="Blerës sh.p.k.", vat="L98765432K", metanow_fiscal_identifier_type=False, is_company=True,
             street="Rruga 2", street2=False, city="Durrës", country_id=False),
@@ -88,6 +89,8 @@ def environment():
     env = fake_odoo.Env()
     env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_send"] = fake_odoo.Trigger()
     env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_poll"] = fake_odoo.Trigger()
+    # The person posting, with no operator code of their own unless a test gives one.
+    env.user = ResUsers(env, id=2)
     return env
 
 
@@ -393,11 +396,12 @@ class GuardTests(unittest.TestCase):
 
 
 class PairingTests(unittest.TestCase):
-    def test_pairing_stores_the_credential_in_one_write_and_fetches_the_profile(self):
+    def test_pairing_stores_the_credential_in_one_write_and_fetches_the_profile_and_codes(self):
         env = environment()
         opener = support.FakeOpener(
             (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
-            (200, support.PROFILE_DOCUMENT))
+            (200, support.PROFILE_DOCUMENT),
+            (200, support.REGISTRY_DOCUMENT))
         record = company(env, opener=opener, metanow_fiscal_credential=False, metanow_fiscal_tenant=False,
                          metanow_fiscal_channel=False, metanow_fiscal_profile=False)
         record._metanow_fiscal_pair(" 123-456 ")
@@ -408,6 +412,22 @@ class PairingTests(unittest.TestCase):
         })
         self.assertEqual(opener.requests[1]["url"], "https://efis.example.invalid/v1/profiles/AL")
         self.assertIsNotNone(record._metanow_fiscal_profile())
+        self.assertEqual(opener.requests[2]["url"], "https://efis.example.invalid/v1/registry")
+        self.assertEqual(opener.requests[2]["headers"]["x-credential"], "c-9")
+        self.assertEqual(record._metanow_fiscal_registry().codes, support.registry().codes)
+
+    def test_pairing_holds_when_the_codes_cannot_be_read(self):
+        # The pairing code is single-use and already spent, so a failed read of the codes must
+        # not undo it. "Check the configuration" reads them again.
+        env = environment()
+        opener = support.FakeOpener(
+            (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
+            (200, support.PROFILE_DOCUMENT),
+            (503, None))
+        record = company(env, opener=opener, metanow_fiscal_credential=False, metanow_fiscal_tenant=False)
+        self.assertTrue(record._metanow_fiscal_pair("123-456"))
+        self.assertEqual(record.metanow_fiscal_credential, "c-9")
+        self.assertIsNone(record._metanow_fiscal_registry())
 
     def test_a_refused_code_stores_nothing(self):
         env = environment()
@@ -423,7 +443,8 @@ class PairingTests(unittest.TestCase):
         env = environment()
         opener = support.FakeOpener(
             (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
-            (200, support.PROFILE_DOCUMENT))
+            (200, support.PROFILE_DOCUMENT),
+            (200, support.REGISTRY_DOCUMENT))
         record = company(env, opener=opener, metanow_fiscal_credential=False)
         settings = ResConfigSettings(env, company_id=record, metanow_fiscal_pairing_code=" 123-456 ")
         settings.set_values()

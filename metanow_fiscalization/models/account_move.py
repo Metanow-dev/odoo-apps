@@ -65,6 +65,11 @@ class AccountMove(models.Model):
     metanow_fiscal_einvoice_error = fields.Text(
         string="Gabimi i faturës elektronike / E-invoice error", copy=False, readonly=True)
     metanow_fiscal_qr_src = fields.Char(compute="_compute_metanow_fiscal_qr_src")
+    # DEV-2436: the operator code of the person who posted the invoice, taken when it is posted.
+    # The send job runs as the cron's user, so it reads this, and every send of the invoice
+    # carries the same code.
+    metanow_fiscal_operator_code = fields.Char(
+        string="Kodi i operatorit / Operator code", copy=False, readonly=True)
 
     @api.depends("metanow_fiscal_verification_url")
     def _compute_metanow_fiscal_qr_src(self):
@@ -91,9 +96,11 @@ class AccountMove(models.Model):
                 continue
             # Validate before issuing: a refusal here rolls the posting back, and no number is
             # spent in efis.
-            move._metanow_fiscal_payload()
+            operator = self.env.user._metanow_fiscal_operator_for(move.company_id) or False
+            move._metanow_fiscal_payload(operator=operator)
             attempt = (move.metanow_fiscal_attempt or 0) + 1
             move.write({
+                "metanow_fiscal_operator_code": operator,
                 outcome.STATE: outcome.TO_SEND,
                 "metanow_fiscal_attempt": attempt,
                 "metanow_fiscal_idempotency_key": move._metanow_fiscal_key(attempt),
@@ -162,16 +169,35 @@ class AccountMove(models.Model):
             "lines": lines,
         }
 
-    def _metanow_fiscal_payload(self):
+    def _metanow_fiscal_config(self, operator=None):
+        """The company's configuration, with this invoice's own codes in place of the company's:
+        the operator of the person who posted it, and the device of its journal."""
+        self.ensure_one()
+        config = self.company_id._metanow_fiscal_config()
+        operator = operator or self.metanow_fiscal_operator_code
+        if operator:
+            config["operator_code"] = operator
+        device = self.journal_id.metanow_fiscal_device_code
+        if device:
+            config["device_code"] = device
+        return config
+
+    def _metanow_fiscal_payload(self, operator=None):
         self.ensure_one()
         company = self.company_id
+        refusal = f"{self.name}: efis nuk do ta pranonte këtë faturë. / efis would not accept this invoice.\n"
         try:
-            return efis_payload.build(
-                self._metanow_fiscal_invoice(), company._metanow_fiscal_config(), company._metanow_fiscal_profile())
+            body = efis_payload.build(
+                self._metanow_fiscal_invoice(), self._metanow_fiscal_config(operator), company._metanow_fiscal_profile())
         except efis_payload.PayloadInvalid as error:
-            raise UserError(
-                f"{self.name}: efis nuk do ta pranonte këtë faturë. / efis would not accept this invoice.\n"
-                + "\n".join(error.problems)) from error
+            raise UserError(refusal + "\n".join(error.problems)) from error
+        # DEV-2436: only codes efis has confirmed. A company that has not read its registry yet
+        # (installed before DEV-2436) is checked by efis alone, as before.
+        registry = company._metanow_fiscal_registry()
+        problems = registry.unconfirmed(body) if registry is not None else []
+        if problems:
+            raise UserError(refusal + "\n".join(problems))
+        return body
 
     # ------------------------------------------------------------------ write-back
 
