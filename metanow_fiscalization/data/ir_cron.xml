@@ -31,4 +31,15 @@
         <field name="interval_type">minutes</field>
         <field name="active" eval="True"/>
     </record>
+
+    <!-- DEV-2433: e-invoices suppliers sent, as draft vendor bills. -->
+    <record id="ir_cron_metanow_fiscal_inbound" model="ir.cron">
+        <field name="name">efis: lexo e-faturat e marra / read received e-invoices</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_metanow_fiscal_inbound()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

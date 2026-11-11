@@ -7,12 +7,27 @@
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
+                <!-- DEV-2433: the buyer's answer to a received e-invoice. It can never be withdrawn. -->
+                <button name="action_metanow_fiscal_accept" type="object" class="btn-primary"
+                        string="Prano e-faturën / Accept the e-invoice"
+                        invisible="not metanow_fiscal_inbound_waiting or not metanow_fiscal_inbound_fiscalised"
+                        confirm="Pranimi i dërgohet autoritetit dhe nuk tërhiqet më. Ta pranoni? / The acceptance goes to the authority and can never be withdrawn. Accept it?"
+                        groups="account.group_account_invoice"/>
+                <button name="action_metanow_fiscal_refuse" type="object"
+                        string="Refuzo e-faturën / Refuse the e-invoice"
+                        invisible="not metanow_fiscal_inbound_waiting"
+                        confirm="Refuzimi i dërgohet autoritetit dhe nuk tërhiqet më. Ta refuzoni? / The refusal goes to the authority and can never be withdrawn. Refuse it?"
+                        groups="account.group_account_invoice"/>
                 <button name="action_metanow_fiscal_retry" type="object"
                         string="Dërgo përsëri te efis / Send to efis again"
                         invisible="metanow_fiscal_state != 'parked'"
                         groups="account.group_account_invoice"/>
             </xpath>
             <xpath expr="//header" position="after">
+                <div class="alert alert-warning mb-0" role="alert" invisible="not metanow_fiscal_inbound_waiting">
+                    <strong>Kjo e-faturë pret përgjigjen tuaj. / This e-invoice is waiting for your answer.</strong>
+                    Përgjigjuni para / Answer before <field name="metanow_fiscal_inbound_answer_by" readonly="1" nolabel="1" class="oe_inline"/>.
+                </div>
                 <div class="alert alert-danger mb-0" role="alert"
                      invisible="metanow_fiscal_state != 'refused'">
                     <strong>efis e refuzoi këtë faturë dhe nuk shpenzoi asnjë numër. Korrigjojeni dhe postojeni përsëri.
@@ -28,6 +43,26 @@
                        readonly="state != 'draft'"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
+                <page name="metanow_fiscal_inbound" string="E-fatura e marrë / Received e-invoice"
+                      invisible="not metanow_fiscal_inbound_id">
+                    <group>
+                        <group>
+                            <field name="metanow_fiscal_inbound_seller"/>
+                            <field name="metanow_fiscal_inbound_amount"/>
+                            <field name="metanow_fiscal_inbound_status"/>
+                        </group>
+                        <group>
+                            <field name="metanow_fiscal_inbound_eic"/>
+                            <field name="metanow_fiscal_inbound_decision"/>
+                            <field name="metanow_fiscal_inbound_answer_by"/>
+                            <field name="metanow_fiscal_inbound_waiting"/>
+                            <field name="metanow_fiscal_inbound_fiscalised" invisible="1"/>
+                            <field name="metanow_fiscal_inbound_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <field name="metanow_fiscal_inbound_note" nolabel="1" style="white-space: pre-wrap;"
+                           invisible="not metanow_fiscal_inbound_note"/>
+                </page>
                 <page name="metanow_fiscal" string="Fiskalizimi / Fiscalisation"
                       invisible="not metanow_fiscal_state">
                     <group>
@@ -91,6 +126,10 @@
                 <filter name="metanow_fiscal_payment_records_due"
                         string="Regjistrime pagesash për t'u depozituar / Payment records to file"
                         domain="[('metanow_fiscal_payment_record_due', '!=', False)]"/>
+                <!-- DEV-2433: received e-invoices still waiting for the buyer's answer. -->
+                <filter name="metanow_fiscal_inbound_waiting"
+                        string="E-fatura që presin përgjigje / E-invoices waiting for an answer"
+                        domain="[('metanow_fiscal_inbound_waiting', '=', True)]"/>
                 <filter name="metanow_fiscal_pending"
                         string="Në pritje të efis / Waiting for efis"
                         domain="[('metanow_fiscal_state', 'in', ('to_send', 'sent', 'deferred'))]"/>

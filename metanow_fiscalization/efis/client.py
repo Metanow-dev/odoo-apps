@@ -22,11 +22,16 @@ RECORD_PAYMENT_RECEIVED = ("POST", "/v1/receivables/{documentId}/payments")
 WITHDRAW_PAYMENT_RECEIVED = ("POST", "/v1/receivables/payments/{paymentId}/withdraw")
 LIST_PAYMENT_RECORDS = ("GET", "/v1/einvoices/payment-records")
 CREATE_PAYMENT_RECORD = ("POST", "/v1/einvoices/payment-records")
+LIST_INBOUND = ("GET", "/v1/einvoices/inbound")
+GET_INBOUND = ("GET", "/v1/einvoices/inbound/{id}")
+GET_INBOUND_PDF = ("GET", "/v1/einvoices/inbound/{id}/pdf")
+DECIDE_INBOUND = ("POST", "/v1/einvoices/inbound/{id}/decision")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
+    LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -125,19 +130,35 @@ class EfisClient:
     def create_payment_record(self, record):
         return self._call(CREATE_PAYMENT_RECORD, {}, body=record)
 
+    # DEV-2433: e-invoices suppliers sent to the business, and the buyer's answer to one.
+    def list_inbound(self):
+        return self._call(LIST_INBOUND, {})
+
+    def get_inbound(self, inbound_id):
+        return self._call(GET_INBOUND, {"id": inbound_id})
+
+    def get_inbound_pdf(self, inbound_id):
+        """The PDF's bytes, as efis serves them (Response.body is bytes, not JSON)."""
+        return self._call(GET_INBOUND_PDF, {"id": inbound_id}, raw=True)
+
+    def decide_inbound(self, inbound_id, decision):
+        if decision not in ("accept", "refuse"):
+            raise ValueError("A decision is accept or refuse.")
+        return self._call(DECIDE_INBOUND, {"id": inbound_id}, body={"decision": decision})
+
     def get_registry(self):
         return self._call(GET_REGISTRY, {})
 
     def get_profile(self, country):
         return self._call(GET_PROFILE, {"country": country}, authenticated=False)
 
-    def _call(self, route, parameters, body=None, headers=None, authenticated=True, query=None):
+    def _call(self, route, parameters, body=None, headers=None, authenticated=True, query=None, raw=False):
         method, template = route
         path = template.format(**{key: urllib.parse.quote(str(value), safe="") for key, value in parameters.items()})
         if query:
             path += "?" + urllib.parse.urlencode({key: str(value) for key, value in query.items() if value is not None})
         request = urllib.request.Request(self.base_url + path, method=method)
-        request.add_header("Accept", "application/json")
+        request.add_header("Accept", "application/pdf" if raw else "application/json")
         request.add_header("User-Agent", self.user_agent)
         data = None
         if body is not None:
@@ -152,7 +173,8 @@ class EfisClient:
             request.add_header(name, value)
         try:
             with self._open(request, data=data, timeout=self.timeout) as answer:
-                return Response(answer.status, _json(answer.read()), answer.headers.items())
+                content = answer.read()
+                return Response(answer.status, content if raw else _json(content), answer.headers.items())
         except urllib.error.HTTPError as error:
             try:
                 raw = error.read()

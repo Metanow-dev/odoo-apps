@@ -16,6 +16,17 @@
                              help="Një faturë pa para në dorë për një blerës me numër tatimor dërgohet si faturë elektronike. / A non-cash invoice to a buyer with a tax number is sent as an e-invoice.">
                         <field name="metanow_fiscal_einvoice"/>
                     </setting>
+                    <!-- DEV-2433 -->
+                    <setting string="E-faturat e marra / Received e-invoices"
+                             help="Çdo e-faturë që një furnitor i dërgon biznesit bëhet një faturë furnitori në draft, me PDF-në. Rreshtat shkruhen nga PDF-ja. / Each e-invoice a supplier sends the business becomes a draft vendor bill, with its PDF. The lines are entered from the PDF.">
+                        <field name="metanow_fiscal_inbound_enabled"/>
+                        <div class="content-group" invisible="not metanow_fiscal_inbound_enabled">
+                            <div class="row mt8">
+                                <label for="metanow_fiscal_inbound_since" class="col-lg-4 o_light_label"/>
+                                <field name="metanow_fiscal_inbound_since"/>
+                            </div>
+                        </div>
+                    </setting>
                     <setting string="Lidhja me efis / Connection to efis" groups="base.group_system">
                         <div class="content-group">
                             <div class="row mt8">
