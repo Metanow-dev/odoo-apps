@@ -9,6 +9,7 @@ from pathlib import Path
 ODOO_DIR = Path(__file__).resolve().parents[1]
 REPO = ODOO_DIR
 MODULE_DIR = ODOO_DIR / "metanow_fiscalization"
+STOCK_DIR = ODOO_DIR / "metanow_fiscalization_stock"
 # efis's published API, copied from the efis version EFIS_IMAGE names. contract/README.md.
 OPENAPI = REPO / "contract" / "efis-openapi-v1.json"
 
@@ -21,6 +22,23 @@ install()
 
 from metanow_fiscalization.efis.profile import Profile  # noqa: E402
 from metanow_fiscalization.efis.registry import Registry  # noqa: E402
+
+
+def _alias_odoo_addons():
+    """Odoo knows the main module as odoo.addons.metanow_fiscalization, and the stock add-on
+    imports it so. The same package is registered under that name here."""
+    import importlib
+    import types
+    import metanow_fiscalization  # noqa: F401
+    addons = sys.modules.setdefault("odoo.addons", types.ModuleType("odoo.addons"))
+    sys.modules["odoo"].addons = addons
+    for name in ("", ".efis", ".efis.money", ".efis.registry", ".efis.client", ".efis.outcome", ".efis.payload"):
+        module = importlib.import_module("metanow_fiscalization" + name)
+        sys.modules["odoo.addons.metanow_fiscalization" + name] = module
+    addons.metanow_fiscalization = sys.modules["odoo.addons.metanow_fiscalization"]
+
+
+_alias_odoo_addons()
 
 
 def openapi():

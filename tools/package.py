@@ -7,7 +7,11 @@ an addons path and Odoo's module upload expect. Entries are sorted and stamped w
 time, so the same source always gives the same bytes, and the SHA-256 written beside it is the
 checksum a customer can compare with the one the efis web app shows.
 
-Usage: package.py [--out DIR] [--manifest]   (prints the zip path and its SHA-256)
+Usage: package.py [--module NAME] [--out DIR] [--manifest]   (prints the zip path and its SHA-256)
+
+--module picks the module (DEV-2429): metanow_fiscalization by default, or the stock add-on
+metanow_fiscalization_stock. Each module is its own zip, with its own manifest.json; give each
+its own --out so the two manifests do not overwrite each other.
 
 With --manifest it also writes manifest.json beside the zip: the file name, the module's
 version, the size and the SHA-256, for the efis web app's Plugins page to read. The image build
@@ -25,6 +29,7 @@ from pathlib import Path
 
 ODOO_DIR = Path(__file__).resolve().parents[1]
 MODULE = "metanow_fiscalization"
+MODULES = (MODULE, "metanow_fiscalization_stock")
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 # Nothing a customer must not receive, and nothing that is not the module.
@@ -49,15 +54,17 @@ def files(module_dir):
         yield path, relative
 
 
-def build(out_dir, module_dir=None, manifest=False):
-    module_dir = Path(module_dir or ODOO_DIR / MODULE)
+def build(out_dir, module_dir=None, manifest=False, module=MODULE):
+    if module not in MODULES:
+        raise ValueError(f"{module} is not a module of this repository")
+    module_dir = Path(module_dir or ODOO_DIR / module)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     version = manifest_version(module_dir)
-    target = out_dir / f"{MODULE}-{version}.zip"
+    target = out_dir / f"{module}-{version}.zip"
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path, relative in files(module_dir):
-            info = zipfile.ZipInfo(f"{MODULE}/{relative.as_posix()}", date_time=FIXED_TIME)
+            info = zipfile.ZipInfo(f"{module}/{relative.as_posix()}", date_time=FIXED_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             info.create_system = 3
@@ -65,14 +72,14 @@ def build(out_dir, module_dir=None, manifest=False):
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     (out_dir / f"{target.name}.sha256").write_text(f"{digest}  {target.name}\n", encoding="ascii")
     if manifest:
-        write_manifest(out_dir, target, version, digest)
+        write_manifest(out_dir, target, version, digest, module)
     return target, digest
 
 
-def write_manifest(out_dir, target, version, digest):
+def write_manifest(out_dir, target, version, digest, module=MODULE):
     """The facts about the zip, as the web app reads them. Same zip, same bytes."""
     facts = {
-        "module": MODULE,
+        "module": module,
         "fileName": target.name,
         "version": version,
         "size": target.stat().st_size,
@@ -85,11 +92,12 @@ def write_manifest(out_dir, target, version, digest):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--module", default=MODULE, choices=MODULES)
     parser.add_argument("--out", default=str(ODOO_DIR.parent / "dist" / "odoo"))
     parser.add_argument("--manifest", action="store_true",
                         help=f"also write {MANIFEST_NAME} (file name, version, size, SHA-256) beside the zip")
     args = parser.parse_args(argv)
-    target, digest = build(args.out, manifest=args.manifest)
+    target, digest = build(args.out, manifest=args.manifest, module=args.module)
     print(f"{target}\n{digest}")
     return 0
 

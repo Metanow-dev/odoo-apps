@@ -1,0 +1,22 @@
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Warehouse transfer notes for Albania, through efis</h2>
+        <h3 class="oe_slogan">An add-on to "AL - Fiskalizimi me efis"</h3>
+        <p>
+            Goods that move inside Albania without a change of owner travel with a warehouse transfer
+            note. This add-on issues it from an Odoo stock transfer: efis numbers the note from the
+            business unit of the warehouse the goods leave from, computes its security code and
+            registers it with the tax authority.
+        </p>
+        <ul>
+            <li>Each warehouse names its business unit and its kind of place, chosen from the codes efis confirmed.</li>
+            <li>Each operation type names the transaction its transfers issue. None is preselected.</li>
+            <li>The transfer and the delivery slip show the note's number and both codes.</li>
+            <li>The note is issued today, immediately before the goods move. A resend never issues a second note.</li>
+        </ul>
+        <p>
+            The module does not sign, number or compute a code, holds no certificate or key, and never
+            talks to the tax authority. It needs an efis account, paired through the main module.
+        </p>
+    </div>
+</section>

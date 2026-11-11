@@ -23,6 +23,7 @@ esac
 
 test -n "${EFIS_IMAGE:-}" || { echo "EFIS_IMAGE is required." >&2; exit 1; }
 test -f dist/odoo/addons/metanow_fiscalization/__manifest__.py || { echo "dist/odoo/addons is missing; run odoo-package first." >&2; exit 1; }
+test -f dist/odoo/addons/metanow_fiscalization_stock/__manifest__.py || { echo "The stock add-on is missing from dist/odoo/addons; run odoo-package first." >&2; exit 1; }
 
 random() { od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; }
 EFIS_POSTGRES_PASSWORD="$(random)"
@@ -53,7 +54,8 @@ field() { printf '%s' "$PAIRING" | sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p
 
 compose --profile odoo up -d --wait odoo-db
 # The install output is kept as an artifact either way; set -e still fails the job on a bad install.
-compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization --stop-after-init --no-http > odoo-install.log 2>&1 \
+# DEV-2429: the stock add-on is installed too, over the main module, so a broken add-on fails here.
+compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization,metanow_fiscalization_stock --stop-after-init --no-http > odoo-install.log 2>&1 \
   || { tail -n 100 odoo-install.log >&2; exit 1; }
 
 compose --profile odoo run --rm -T \

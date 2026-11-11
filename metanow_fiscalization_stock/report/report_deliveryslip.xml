@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <!-- DEV-2429: the transfer note's number and codes, printed on the delivery slip. -->
+    <template id="report_delivery_document_metanow_fiscal" inherit_id="stock.report_delivery_document">
+        <xpath expr="//div[@id='informations']" position="after">
+            <div t-if="o.metanow_fiscal_wtn_number" class="row mb-4" name="metanow_fiscal_wtn">
+                <div class="col-12">
+                    <strong>Faturë shoqëruese / Transfer note:</strong> <span t-field="o.metanow_fiscal_wtn_number"/>
+                    <span t-if="o.metanow_fiscal_wtn_issued_at"> · <span t-field="o.metanow_fiscal_wtn_issued_at"/></span>
+                </div>
+                <div class="col-12">
+                    <strong>NSLFSH:</strong> <span t-field="o.metanow_fiscal_wtn_security_code"/>
+                </div>
+                <div class="col-12" t-if="o.metanow_fiscal_wtn_registration_code">
+                    <strong>NIVFSH:</strong> <span t-field="o.metanow_fiscal_wtn_registration_code"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
