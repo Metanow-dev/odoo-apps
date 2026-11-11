@@ -157,8 +157,24 @@ class AccountMove(models.Model):
                     for tax in line.tax_ids
                 ],
             })
+        # DEV-2358: what an e-invoice carries beyond the fiscal record. The bank account is the
+        # company's account the invoice is paid into (the invoice's recipient bank); only an IBAN
+        # is sent. delivery_date is read only where this Odoo has the field.
+        bank = None
+        account = self.partner_bank_id
+        if account and account.acc_type == "iban":
+            bank = {
+                "iban": account.acc_number,
+                "bic": account.bank_id.bic if account.bank_id else None,
+                "holder": account.acc_holder_name or None,
+            }
+        delivered = getattr(self, "delivery_date", False)
         return {
             "reference": self.name,
+            "due_date": self.invoice_date_due.isoformat() if self.invoice_date_due else None,
+            "customer_reference": self.ref or None,
+            "delivery_date": delivered.isoformat() if delivered else None,
+            "bank": bank,
             "currency": self.currency_id.name,
             "company_currency": self.company_id.currency_id.name,
             "amount_total": self.amount_total,

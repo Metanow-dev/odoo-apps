@@ -11,6 +11,8 @@ refuse an invoice whose totals efis would compute differently from Odoo, rather 
 fiscal record that disagrees with the books.
 """
 
+import re
+from datetime import date
 from decimal import Decimal
 
 from . import money
@@ -28,6 +30,15 @@ BUYER_KINDS = (BUSINESS,)
 
 # The national currency, which efis and the authority's request leave implicit.
 NATIONAL_CURRENCY = "ALL"
+
+# The payment methods efis reads as a credit transfer (UNCL 4461 code 30), the only means an
+# account to pay into belongs to (efis UblInvoice.PaymentMeansCode; EN 16931 BG-17). efis refuses
+# an IBAN on an e-invoice paid any other way (einvoice_account_requires_transfer).
+CREDIT_TRANSFER_METHODS = ("ACCOUNT", "TRANSFER")
+
+# efis's own shapes for the account to pay into (EinvoiceDraft.IbanShape, BicShape).
+_IBAN_SHAPE = re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$")
+_BIC_SHAPE = re.compile(r"^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$")
 
 
 class PayloadInvalid(ValueError):
@@ -138,6 +149,12 @@ def build(invoice, config, profile):
     buyer, buyer_problems = _buyer(invoice.get("buyer"), profile)
     problems.extend(buyer_problems)
 
+    electronic = _electronic(config, method, cash, invoice.get("buyer"))
+    due_date = einvoice = None
+    if electronic:
+        due_date, einvoice, einvoice_problems = _einvoice_fields(invoice, method)
+        problems.extend(einvoice_problems)
+
     if problems:
         raise PayloadInvalid(problems)
 
@@ -161,8 +178,12 @@ def build(invoice, config, profile):
     _put(body, "softwareCode", _text(config.get("software_code")))
     if cash:
         body["deviceCode"] = device_code
-    if _electronic(config, method, cash, invoice.get("buyer")):
+    if electronic:
         body["electronic"] = True
+        # DEV-2358: what an e-invoice carries beyond the fiscal record (efis DEV-2354), and the
+        # payment due date (efis's paymentDueDate). A plain fiscal invoice is unchanged.
+        _put(body, "paymentDueDate", due_date)
+        _put(body, "einvoice", einvoice)
     # issuedAt is left out on purpose: efis stamps the moment it receives the document, which
     # is on time by construction (builder-log 75). Odoo's invoice_date is a date, not a moment.
     return body
@@ -261,6 +282,63 @@ def _electronic(config, method, cash, buyer):
     if config.get("einvoice") is not True or not method or cash or not buyer:
         return False
     return bool(_text(buyer.get("identifier"))) and _text(buyer.get("identifier_type")) is None
+
+
+def _einvoice_fields(invoice, method):
+    """The payment due date and the e-invoice part, from what Odoo has on the invoice.
+
+    Only what Odoo holds without guessing is sent: the due date, the company's bank account the
+    invoice is paid into (an IBAN, with its BIC and holder), the customer's reference (BT-10) and
+    the delivery date. Each is left out when Odoo has none. A value efis would refuse is refused
+    here, before posting, so no number is spent on it.
+    """
+    problems = []
+    due_date = _text(invoice.get("due_date"))
+    if due_date is not None:
+        try:
+            date.fromisoformat(due_date)
+        except ValueError:
+            problems.append(
+                f"Afati i pagesës {due_date} nuk është datë. / The payment due date {due_date} is not a date.")
+
+    part = {}
+    bank = invoice.get("bank") or {}
+    iban = _text(bank.get("iban"))
+    if iban is not None and method in CREDIT_TRANSFER_METHODS:
+        iban = "".join(iban.split()).upper()
+        bic = _text(bank.get("bic"))
+        bic = bic.upper() if bic else None
+        if not _is_iban(iban):
+            problems.append(
+                f"Llogaria bankare {iban} nuk është IBAN i vlefshëm. / The bank account {iban} is not a valid IBAN.")
+        if bic is not None and not _BIC_SHAPE.match(bic):
+            problems.append(f"Kodi BIC {bic} nuk është i vlefshëm. / The BIC {bic} is not valid.")
+        payment = {"accountId": iban}
+        _put(payment, "serviceProvider", bic)
+        _put(payment, "accountName", _text(bank.get("holder")))
+        part["payment"] = payment
+
+    _put(part, "buyerReference", _text(invoice.get("customer_reference")))
+
+    delivered = _text(invoice.get("delivery_date"))
+    if delivered is not None:
+        try:
+            date.fromisoformat(delivered)
+            part["delivery"] = {"date": delivered}
+        except ValueError:
+            problems.append(
+                f"Data e dorëzimit {delivered} nuk është datë. / The delivery date {delivered} is not a date.")
+
+    return due_date, (part or None), problems
+
+
+def _is_iban(iban):
+    """ISO 13616: efis's shape, then the mod-97 check, as EinvoiceDraft.IsIban does."""
+    if not _IBAN_SHAPE.match(iban):
+        return False
+    moved = iban[4:] + iban[:4]
+    digits = "".join(str(int(char, 36)) for char in moved)
+    return int(digits) % 97 == 1
 
 
 def _seller(config):
