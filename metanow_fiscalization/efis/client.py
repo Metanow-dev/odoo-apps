@@ -27,12 +27,17 @@ LIST_INBOUND = ("GET", "/v1/einvoices/inbound")
 GET_INBOUND = ("GET", "/v1/einvoices/inbound/{id}")
 GET_INBOUND_PDF = ("GET", "/v1/einvoices/inbound/{id}/pdf")
 DECIDE_INBOUND = ("POST", "/v1/einvoices/inbound/{id}/decision")
+LIST_WEBHOOKS = ("GET", "/v1/webhooks")
+CREATE_WEBHOOK = ("POST", "/v1/webhooks")
+DISABLE_WEBHOOK = ("POST", "/v1/webhooks/{id}/disable")
+GET_TENANT_HEALTH = ("GET", "/v1/tenants/{id}/health")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, LIST_DOCUMENTS, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
     LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
+    LIST_WEBHOOKS, CREATE_WEBHOOK, DISABLE_WEBHOOK, GET_TENANT_HEALTH,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -150,6 +155,19 @@ class EfisClient:
         if decision not in ("accept", "refuse"):
             raise ValueError("A decision is accept or refuse.")
         return self._call(DECIDE_INBOUND, {"id": inbound_id}, body={"decision": decision})
+
+    # DEV-1704: the endpoint efis posts events to, and the business's health (its certificate).
+    def list_webhooks(self):
+        return self._call(LIST_WEBHOOKS, {})
+
+    def create_webhook(self, url, events):
+        return self._call(CREATE_WEBHOOK, {}, body={"url": url, "events": list(events)})
+
+    def disable_webhook(self, endpoint_id):
+        return self._call(DISABLE_WEBHOOK, {"id": endpoint_id})
+
+    def get_health(self):
+        return self._call(GET_TENANT_HEALTH, {"id": self.tenant})
 
     def get_registry(self):
         return self._call(GET_REGISTRY, {})

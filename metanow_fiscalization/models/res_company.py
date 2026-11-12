@@ -6,6 +6,7 @@ from odoo.exceptions import UserError, ValidationError
 
 from ..efis import client as efis_client
 from ..efis import registry as efis_registry
+from ..efis import webhooks as efis_webhooks
 from ..efis.profile import Profile
 from ..efis.restore import CONFLICT, REASONS
 
@@ -19,6 +20,12 @@ PAIRING_FIELDS = (
     "metanow_fiscal_tenant",
     "metanow_fiscal_channel",
 )
+
+# DEV-1704: the certificate states that need a person, as efis's health read names them, and
+# the To-Do the company's Settings administrators get for them (decided 12 Nov 2026). A missing
+# certificate is shown in Settings but sets no To-Do: it is the state of every new business.
+CERTIFICATE_ATTENTION = ("expiring", "expired")
+CERTIFICATE_ACTIVITY = "efis: certifikata e nënshkrimit / signing certificate"
 
 # DEV-2436: the company's codes, each of the kind efis's registry confirms it under.
 COMPANY_CODES = (
@@ -101,6 +108,17 @@ class ResCompany(models.Model):
     metanow_fiscal_restore_pending = fields.Boolean(copy=False, readonly=True)
     metanow_fiscal_restore_summary = fields.Text(
         string="Rikthimi i fundit nga efis / Last restore from efis", copy=False, readonly=True)
+    # DEV-1704: the endpoint efis posts events to. The secret checks each post's signature; like
+    # the credential, it is readable only by Settings administrators and never signs anything.
+    metanow_fiscal_webhook_id = fields.Char(copy=False, readonly=True)
+    metanow_fiscal_webhook_secret = fields.Char(copy=False, readonly=True, groups="base.group_system")
+    metanow_fiscal_webhook_status = fields.Text(
+        string="Njoftimet nga efis / Events from efis", copy=False, readonly=True)
+    # DEV-1704: the signing certificate in efis, as its health read says.
+    metanow_fiscal_certificate_status = fields.Char(copy=False, readonly=True)
+    metanow_fiscal_certificate_until = fields.Date(
+        string="Certifikata skadon më / The certificate expires on", copy=False, readonly=True)
+    metanow_fiscal_profile_stale = fields.Boolean(copy=False, readonly=True)
 
     @api.constrains(*(name for name, _ in COMPANY_CODES))
     def _check_metanow_fiscal_codes(self):
@@ -166,6 +184,9 @@ class ResCompany(models.Model):
         # DEV-2443: invoices that lost their fiscal values in an uninstall get them back from efis.
         # On a company with none, the run finds nothing and only says so.
         self._metanow_fiscal_restore_request()
+        # DEV-1704: events instead of waiting for the poll, where efis can reach this Odoo. A
+        # failure here never undoes the pairing: the module polls as before, and says why.
+        self._metanow_fiscal_register_webhook()
         return True
 
     def _metanow_fiscal_restore_request(self):
@@ -194,6 +215,135 @@ class ResCompany(models.Model):
             summary = (f"Rikthyer: {restored} · Lënë mënjanë: {skipped} · Në konflikt: {conflicts} "
                        f"/ Restored: {restored} · Left alone: {skipped} · In conflict: {conflicts}")
         self.sudo().write({"metanow_fiscal_restore_pending": False, "metanow_fiscal_restore_summary": summary})
+
+    # ------------------------------------------------------------------ events (DEV-1704)
+
+    def _metanow_fiscal_webhook_address(self):
+        self.ensure_one()
+        base = self.env["ir.config_parameter"].sudo().get_str("web.base.url")
+        return efis_webhooks.address(base, self.id), base
+
+    def _metanow_fiscal_register_webhook(self):
+        """Subscribe this company's URL to efis's events. Returns True when efis will post.
+
+        An endpoint efis already has for this URL is disabled first: its secret was lost with a
+        reinstall or a new pairing, so its posts could not be checked, and efis keeps at most ten.
+        """
+        self.ensure_one()
+        url, base = self._metanow_fiscal_webhook_address()
+        if not url:
+            self._metanow_fiscal_webhook_store(False, False, (
+                f"efis nuk mund ta arrijë këtë Odoo ({base or '-'}): duhet një adresë publike https. "
+                f"Gjendjet lexohen sipas orarit. / efis cannot reach this Odoo ({base or '-'}): it needs a "
+                "public https address. States are read on a schedule instead."))
+            return False
+        try:
+            client = self._metanow_fiscal_client()
+            listing = client.list_webhooks()
+            endpoints = (listing.body or {}).get("endpoints") or [] if listing.status == 200 else []
+            for endpoint in endpoints:
+                if endpoint.get("url") == url and not endpoint.get("disabledAt"):
+                    client.disable_webhook(endpoint["id"])
+            answer = client.create_webhook(url, efis_webhooks.TOPICS)
+        except (efis_client.EfisUnavailable, UserError) as error:
+            self._metanow_fiscal_webhook_store(False, False, (
+                f"efis nuk u përgjigj; gjendjet lexohen sipas orarit. / efis did not answer; states are read on a "
+                f"schedule instead. ({error})"))
+            return False
+        body = answer.body if isinstance(answer.body, dict) else {}
+        if answer.status != 201 or not body.get("id") or not body.get("secret"):
+            code = body.get("code") or answer.status
+            self._metanow_fiscal_webhook_store(False, False, (
+                f"efis nuk e regjistroi adresën ({code}); gjendjet lexohen sipas orarit. "
+                f"/ efis did not register the address ({code}); states are read on a schedule instead."))
+            return False
+        self._metanow_fiscal_webhook_store(body["id"], body["secret"], (
+            f"efis i dërgon njoftimet te {url}. / efis sends its events to {url}."))
+        return True
+
+    def _metanow_fiscal_webhook_store(self, endpoint, secret, status):
+        self.sudo().write({
+            "metanow_fiscal_webhook_id": endpoint,
+            "metanow_fiscal_webhook_secret": secret,
+            "metanow_fiscal_webhook_status": status,
+        })
+
+    def _metanow_fiscal_webhook_received(self, message):
+        """Act on one checked event. Nothing in it is stored: each is a reason to read efis again,
+        and the reading happens in the jobs, never in efis's request."""
+        self.ensure_one()
+        kind, object_id = message["type"], message.get("object_id")
+        Move = self.env["account.move"].sudo()
+        if kind in efis_webhooks.DOCUMENT_TOPICS and object_id:
+            moves = Move.search([("company_id", "=", self.id), ("metanow_fiscal_document_id", "=", object_id)])
+            if moves:
+                moves.write({"metanow_fiscal_refresh": True})
+                Move._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
+        elif kind in efis_webhooks.INBOUND_TOPICS:
+            Move._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_inbound")
+        elif kind == efis_webhooks.CERTIFICATE_EXPIRING:
+            Move._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_health")
+        elif kind == efis_webhooks.PROFILE_UPDATED:
+            self.sudo().write({"metanow_fiscal_profile_stale": True})
+            Move._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_health")
+
+    def _metanow_fiscal_refresh_health(self):
+        """Read the certificate's state from efis, and say so to the people who can fix it."""
+        self.ensure_one()
+        if self.metanow_fiscal_profile_stale:
+            try:
+                self._metanow_fiscal_refresh_profile()
+                self.sudo().write({"metanow_fiscal_profile_stale": False})
+            except UserError as error:
+                _logger.info("efis profile not read for company %s: %s", self.id, error)
+        try:
+            response = self._metanow_fiscal_client().get_health()
+        except (efis_client.EfisUnavailable, UserError) as error:
+            _logger.info("efis health not read for company %s: %s", self.id, error)
+            return
+        if response.status != 200 or not isinstance(response.body, dict):
+            return
+        certificate = response.body.get("certificate") or {}
+        status = str(certificate.get("status") or "") or False
+        until = str(certificate.get("notAfter") or "")[:10] or False
+        if (status, until) != (self.metanow_fiscal_certificate_status or False,
+                               str(self.metanow_fiscal_certificate_until or "") or False):
+            self.sudo().write({"metanow_fiscal_certificate_status": status, "metanow_fiscal_certificate_until": until})
+        self._metanow_fiscal_certificate_activities(status in CERTIFICATE_ATTENTION)
+
+    def _metanow_fiscal_certificate_notice(self):
+        """The Settings warning for the certificate, or None while it is valid."""
+        self.ensure_one()
+        status = self.metanow_fiscal_certificate_status
+        until = str(self.metanow_fiscal_certificate_until or "-")
+        if status == "expiring":
+            return (f"Certifikata e nënshkrimit në efis skadon më {until}. Ngarkoni certifikatën e re në efis para kësaj date. "
+                    f"/ The signing certificate in efis expires on {until}. Upload its replacement to efis before then.")
+        if status == "expired":
+            return (f"Certifikata e nënshkrimit në efis skadoi më {until}; efis nuk lëshon fatura derisa të ngarkoni një të vlefshme. "
+                    f"/ The signing certificate in efis expired on {until}; efis issues no invoices until a valid one is uploaded.")
+        if status == "missing":
+            return ("efis nuk ka certifikatë nënshkrimi për këtë biznes. "
+                    "/ efis has no signing certificate for this business.")
+        return None
+
+    def _metanow_fiscal_certificate_activities(self, needed):
+        """One To-Do for each Settings administrator of the company while the certificate needs
+        attention, and none once it does not (decided 12 Nov 2026)."""
+        self.ensure_one()
+        partner = self.partner_id
+        Activity = self.env["mail.activity"].sudo()
+        existing = Activity.search([("res_model", "=", "res.partner"), ("res_id", "=", partner.id),
+                                    ("summary", "=", CERTIFICATE_ACTIVITY)])
+        if not needed:
+            existing.unlink()
+            return
+        notice = self._metanow_fiscal_certificate_notice()
+        group = self.env.ref("base.group_system")
+        admins = group.sudo().all_user_ids.filtered(lambda user: self in user.company_ids and not user.share)
+        for user in admins - existing.mapped("user_id"):
+            partner.sudo().activity_schedule(
+                "mail.mail_activity_data_todo", user_id=user.id, summary=CERTIFICATE_ACTIVITY, note=notice)
 
     def _metanow_fiscal_refresh_registry(self):
         """Read the codes efis has confirmed for this business, and keep them on the company."""

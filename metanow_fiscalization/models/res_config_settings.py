@@ -36,6 +36,23 @@ class ResConfigSettings(models.TransientModel):
     metanow_fiscal_restore_pending = fields.Boolean(related="company_id.metanow_fiscal_restore_pending")
     metanow_fiscal_restore_summary = fields.Text(related="company_id.metanow_fiscal_restore_summary")
 
+    # DEV-1704
+    metanow_fiscal_webhook_status = fields.Text(related="company_id.metanow_fiscal_webhook_status")
+    metanow_fiscal_certificate_notice = fields.Text(compute="_compute_metanow_fiscal_certificate_notice")
+
+    @api.depends("company_id")
+    def _compute_metanow_fiscal_certificate_notice(self):
+        for settings in self:
+            settings.metanow_fiscal_certificate_notice = settings.company_id._metanow_fiscal_certificate_notice() or False
+
+    def action_metanow_fiscal_register_webhook(self):
+        """Ask efis again to post its events here, after the Odoo address changed, for example."""
+        self.ensure_one()
+        if not self.company_id.metanow_fiscal_tenant:
+            raise UserError("Çiftoni kompaninë me efis më parë. / Pair the company with efis first.")
+        self.company_id._metanow_fiscal_register_webhook()
+        return {"type": "ir.actions.client", "tag": "reload"}
+
     def action_metanow_fiscal_restore(self):
         """Read the fiscal values back from efis into the invoices that lost them. Only reads."""
         self.ensure_one()
