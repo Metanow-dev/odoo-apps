@@ -99,7 +99,7 @@ class AccountMove(models.Model):
     metanow_fiscal_einvoice_state = fields.Char(
         string="Gjendja e faturës elektronike / E-invoice state", copy=False, readonly=True)
     metanow_fiscal_einvoice_eic = fields.Char(
-        string="EIC", copy=False, readonly=True,
+        string="EIC e e-faturës / Sent e-invoice EIC", copy=False, readonly=True,
         help="Kodi që autoriteti i jep faturës elektronike. / The code the authority gives the e-invoice.")
     metanow_fiscal_einvoice_error = fields.Text(
         string="Gabimi i faturës elektronike / E-invoice error", copy=False, readonly=True)
@@ -133,7 +133,9 @@ class AccountMove(models.Model):
     # carries no lines, so these are what the bill knows from the authority.
     metanow_fiscal_inbound_id = fields.Char(
         string="E-fatura e marrë në efis / Received e-invoice in efis", copy=False, readonly=True, index=True)
-    metanow_fiscal_inbound_eic = fields.Char(string="EIC", copy=False, readonly=True)
+    # DEV-2461: its own label. Odoo shows both on bank statement lines, through account.move.
+    metanow_fiscal_inbound_eic = fields.Char(
+        string="EIC e faturës së marrë / Received e-invoice EIC", copy=False, readonly=True)
     metanow_fiscal_inbound_seller = fields.Char(
         string="Numri tatimor i shitësit / Seller's tax number", copy=False, readonly=True)
     metanow_fiscal_inbound_amount = fields.Char(

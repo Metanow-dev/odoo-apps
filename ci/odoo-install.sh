@@ -58,6 +58,10 @@ compose --profile odoo up -d --wait odoo-db
 # DEV-2429, DEV-2437: the add-ons are installed too, over the main module, so a broken one fails here.
 compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization,metanow_fiscalization_stock,metanow_fiscalization_pos --stop-after-init --no-http > odoo-install.log 2>&1 \
   || { tail -n 100 odoo-install.log >&2; exit 1; }
+# DEV-2461: two of the module's fields with one label show as two identical columns.
+if grep 'have the same label' odoo-install.log | grep -q 'metanow_fiscal'; then
+  grep 'have the same label' odoo-install.log >&2; echo "Two of the module's fields share a label." >&2; exit 1
+fi
 
 compose --profile odoo run --rm -T \
   -e EFIS_BASE_URL=http://api:8080 \
