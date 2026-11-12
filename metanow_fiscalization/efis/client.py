@@ -27,12 +27,20 @@ LIST_INBOUND = ("GET", "/v1/einvoices/inbound")
 GET_INBOUND = ("GET", "/v1/einvoices/inbound/{id}")
 GET_INBOUND_PDF = ("GET", "/v1/einvoices/inbound/{id}/pdf")
 DECIDE_INBOUND = ("POST", "/v1/einvoices/inbound/{id}/decision")
+SUBMIT_TRANSPORT_DOCUMENT = ("POST", "/v1/transport-documents")
+LIST_TRANSPORT_DOCUMENTS = ("GET", "/v1/transport-documents")
+SUBMIT_TRANSPORT_INVOICE = ("POST", "/v1/transport-invoices")
+LIST_TRANSPORT_INVOICES = ("GET", "/v1/transport-invoices")
+SUBMIT_CASH_DEPOSIT = ("POST", "/v1/cash-deposits")
+LIST_CASH_DEPOSITS = ("GET", "/v1/cash-deposits")
 
 ROUTES = (
     PAIR, SUBMIT_DOCUMENT, LIST_DOCUMENTS, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
     LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
+    SUBMIT_TRANSPORT_DOCUMENT, LIST_TRANSPORT_DOCUMENTS, SUBMIT_TRANSPORT_INVOICE, LIST_TRANSPORT_INVOICES,
+    SUBMIT_CASH_DEPOSIT, LIST_CASH_DEPOSITS,
 )
 
 USER_AGENT = "metanow_fiscalization"
@@ -150,6 +158,33 @@ class EfisClient:
         if decision not in ("accept", "refuse"):
             raise ValueError("A decision is accept or refuse.")
         return self._call(DECIDE_INBOUND, {"id": inbound_id}, body={"decision": decision})
+
+    # DEV-2429: the warehouse transfer note, for the stock add-on (metanow_fiscalization_stock).
+    def submit_transport_document(self, note, idempotency_key):
+        if not idempotency_key:
+            raise ValueError("A transfer note is never sent without an idempotency key.")
+        return self._call(SUBMIT_TRANSPORT_DOCUMENT, {}, body=note, headers={"Idempotency-Key": idempotency_key})
+
+    def list_transport_documents(self):
+        return self._call(LIST_TRANSPORT_DOCUMENTS, {})
+
+    # DEV-2430: the transport invoice, for the same add-on.
+    def submit_transport_invoice(self, invoice, idempotency_key):
+        if not idempotency_key:
+            raise ValueError("A transport invoice is never sent without an idempotency key.")
+        return self._call(SUBMIT_TRANSPORT_INVOICE, {}, body=invoice, headers={"Idempotency-Key": idempotency_key})
+
+    def list_transport_invoices(self):
+        return self._call(LIST_TRANSPORT_INVOICES, {})
+
+    # DEV-2437: Point of Sale cash, for the POS add-on (metanow_fiscalization_pos).
+    def submit_cash_deposit(self, deposit, idempotency_key):
+        if not idempotency_key:
+            raise ValueError("A cash deposit is never sent without an idempotency key.")
+        return self._call(SUBMIT_CASH_DEPOSIT, {}, body=deposit, headers={"Idempotency-Key": idempotency_key})
+
+    def list_cash_deposits(self):
+        return self._call(LIST_CASH_DEPOSITS, {})
 
     def get_registry(self):
         return self._call(GET_REGISTRY, {})

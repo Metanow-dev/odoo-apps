@@ -37,23 +37,33 @@ test:
     - |
       python - <<'EOF'
       import ast, os, sys
-      version = ast.literal_eval(open("metanow_fiscalization/__manifest__.py", encoding="utf-8").read())["version"]
       series = os.environ["ODOO_SERIES"]
-      sys.exit(0 if version.startswith(series + ".") else f"manifest version {version} is not for series {series}")
+      for module in ("metanow_fiscalization", "metanow_fiscalization_stock", "metanow_fiscalization_pos"):
+          version = ast.literal_eval(open(f"{module}/__manifest__.py", encoding="utf-8").read())["version"]
+          if not version.startswith(series + "."):
+              sys.exit(f"{module} manifest version {version} is not for series {series}")
       EOF
 
 # DEV-1766: one zip for every customer, byte-identical on every rebuild, with its SHA-256 and a
-# manifest.json for the efis web app's Plugins page.
+# manifest.json for the efis web app's Plugins page. DEV-2429 and DEV-2437: each add-on is a zip
+# of its own, with its own manifest.json, in dist/odoo-stock and dist/odoo-pos; dist/odoo is the
+# main module's, as before.
 package:
   stage: package
   image: python:3.13-alpine
   script:
     - python tools/package.py --out dist/odoo --manifest
+    - python tools/package.py --module metanow_fiscalization_stock --out dist/odoo-stock --manifest
+    - python tools/package.py --module metanow_fiscalization_pos --out dist/odoo-pos --manifest
     - python -m zipfile -e dist/odoo/metanow_fiscalization-*.zip dist/odoo/addons
-    - cat dist/odoo/*.sha256
+    - python -m zipfile -e dist/odoo-stock/metanow_fiscalization_stock-*.zip dist/odoo/addons
+    - python -m zipfile -e dist/odoo-pos/metanow_fiscalization_pos-*.zip dist/odoo/addons
+    - cat dist/odoo/*.sha256 dist/odoo-stock/*.sha256 dist/odoo-pos/*.sha256
   artifacts:
     paths:
       - dist/odoo/
+      - dist/odoo-stock/
+      - dist/odoo-pos/
     expire_in: 90 days
 
 # DEV-1731: the zip installed into a disposable Odoo beside the pinned efis image, posting one
@@ -84,10 +94,13 @@ install:
       when: manual
       allow_failure: true
 
-# A release is a new version. The zip goes to this project's package registry under its version,
-# where a version is written once: re-releasing the same version fails here, so bump `version` in
-# the manifest first. Then the series branch moves to this commit. The push is not forced, so a
-# commit made on 20.0 by hand fails the release instead of being overwritten.
+# A release is a new version. Each module's zip goes to this project's package registry under its
+# own name and version, where a version is written once. A module whose version is already
+# released is left as it is only if its zip is the released one, byte for byte; one that changed
+# under a released version fails the release, and so does a release in which no module has a new
+# version. So bump `version` in the manifest of each module that changed first. Then the series branch moves to this
+# commit. The push is not forced, so a commit made on 20.0 by hand fails the release instead of
+# being overwritten.
 release:
   stage: release
   image: alpine:3.21
@@ -101,15 +114,28 @@ release:
   script:
     - |
       test -n "$ODOO_APPS_PUSH_TOKEN" || { echo "ODOO_APPS_PUSH_TOKEN must be set, protected and masked: a project access token of this project, Maintainer, write_repository." >&2; exit 1; }
-    - ZIP="$(ls dist/odoo/metanow_fiscalization-*.zip)"
-    - VERSION="$(basename "$ZIP" .zip | sed 's/^metanow_fiscalization-//')"
-    - PACKAGE_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/metanow_fiscalization/${VERSION}"
     - |
-      if curl -fsS -o /dev/null --header "JOB-TOKEN: $CI_JOB_TOKEN" "$PACKAGE_URL/$(basename "$ZIP")"; then
-        echo "Version $VERSION is already released. Bump version in metanow_fiscalization/__manifest__.py." >&2; exit 1
-      fi
-    - |
-      for file in "$ZIP" "$ZIP.sha256" dist/odoo/manifest.json; do
-        curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$file" "$PACKAGE_URL/$(basename "$file")?select=package_file" > /dev/null
+      released=0
+      for entry in metanow_fiscalization:dist/odoo metanow_fiscalization_stock:dist/odoo-stock metanow_fiscalization_pos:dist/odoo-pos; do
+        MODULE="${entry%%:*}"; DIR="${entry#*:}"
+        ZIP="$(ls "$DIR/$MODULE"-*.zip)"
+        VERSION="$(basename "$ZIP" .zip | sed "s/^$MODULE-//")"
+        PACKAGE_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${MODULE}/${VERSION}"
+        if RELEASED="$(curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" "$PACKAGE_URL/$(basename "$ZIP").sha256")"; then
+          # The zip is byte-identical on every rebuild, so an unchanged module has the released
+          # checksum. A module that changed under a released version would reach 20.0 unbumped.
+          if [ "$RELEASED" != "$(cat "$ZIP.sha256")" ]; then
+            echo "$MODULE changed, but $VERSION is already released. Bump version in $MODULE/__manifest__.py." >&2; exit 1
+          fi
+          echo "$MODULE $VERSION is already released and unchanged; left as it is."
+          continue
+        fi
+        for file in "$ZIP" "$ZIP.sha256" "$DIR/manifest.json"; do
+          curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$file" "$PACKAGE_URL/$(basename "$file")?select=package_file" > /dev/null
+        done
+        released=$((released + 1))
       done
+      if [ "$released" -eq 0 ]; then
+        echo "No module has a new version. Bump version in the __manifest__.py of the module that changed." >&2; exit 1
+      fi
     - git push "https://release:${ODOO_APPS_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "HEAD:refs/heads/${ODOO_SERIES}"

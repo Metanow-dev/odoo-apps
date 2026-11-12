@@ -11,6 +11,8 @@ year. The two meet only at efis's public API (`contract/README.md`).
 | Path | What it is |
 | --- | --- |
 | `metanow_fiscalization/` | The module. The Odoo Apps store reads this folder. |
+| `metanow_fiscalization_pos/` | The Point of Sale add-on (DEV-2437): the cash register's opening float and cash in and out, declared through efis. It depends on `point_of_sale`. The store reads this folder too. |
+| `metanow_fiscalization_stock/` | The stock add-on (DEV-2429): warehouse transfer notes for stock transfers. It depends on `stock`, so the main module never makes a customer install Inventory. The store reads this folder too. |
 | `tests/` | Unit tests. They need no Odoo and no network. |
 | `tools/package.py` | Builds the reproducible zip. |
 | `ci/` | The install check: the module in a disposable Odoo beside efis and its mock authority. |
@@ -20,14 +22,17 @@ year. The two meet only at efis's public API (`contract/README.md`).
 
 - **`develop`**: day-to-day work. Merge requests target it. Its pipeline runs the tests, builds the
   zip and installs it into Odoo beside efis.
-- **`main`**: releases. Merge `develop` into `main` to release. Bump `version` in
-  `__manifest__.py` first: a version is released once, and the pipeline refuses to release it again.
+- **`main`**: releases. Merge `develop` into `main` to release. Bump `version` in the
+  `__manifest__.py` of each module that changed first: a version is released once. A module whose
+  zip is the released one, byte for byte, is left as it is; one that changed under a released
+  version stops the release.
 - **`20.0`**: written only by the release job on `main`. It is what GitHub mirrors and what the Odoo
   Apps store reads. Never commit to it, here or on GitHub; the release push is not forced, so a
   stray commit there stops the next release.
 
-A release publishes the zip, its SHA-256 and `manifest.json` to this project's package registry
-(Deploy › Package registry, `metanow_fiscalization/<version>`), then moves `20.0`.
+A release publishes each module's zip, its SHA-256 and its `manifest.json` to this project's
+package registry (Deploy › Package registry, `metanow_fiscalization/<version>` and
+`metanow_fiscalization_stock/<version>` and `metanow_fiscalization_pos/<version>`), then moves `20.0`.
 
 When Odoo 21 comes, first branch `release/20.0` from `main` if 20.0 will still need fixes. Then, on
 `develop`, set `ODOO_SERIES` and `EFIS_ODOO_IMAGE` in `.gitlab-ci.yml` to 21.0 and the manifest's
@@ -39,6 +44,8 @@ registered on the store as a new series.
 ```sh
 python -m unittest discover -s tests -t tests      # Python 3.13, no Odoo needed
 python tools/package.py --out dist/odoo            # prints the zip and its SHA-256
+python tools/package.py --module metanow_fiscalization_stock --out dist/odoo-stock
+python tools/package.py --module metanow_fiscalization_pos --out dist/odoo-pos
 ```
 
 The install check needs Docker and the efis image: see `ci/odoo-install.sh`.

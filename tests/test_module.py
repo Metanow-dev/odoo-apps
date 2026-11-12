@@ -16,14 +16,16 @@ from pathlib import Path
 import support
 
 MODULE = support.MODULE_DIR
+STOCK = support.STOCK_DIR
+POS = support.POS_DIR
 
 
 def _token(*parts):
     return "".join(parts)
 
 
-def module_files(*suffixes):
-    return sorted(path for path in MODULE.rglob("*") if path.is_file() and path.suffix in suffixes
+def module_files(module, *suffixes):
+    return sorted(path for path in module.rglob("*") if path.is_file() and path.suffix in suffixes
                   and "__pycache__" not in path.parts)
 
 
@@ -68,14 +70,39 @@ FROZEN_XML_IDS = {
 }
 
 
-def manifest():
-    return ast.literal_eval((MODULE / "__manifest__.py").read_text(encoding="utf-8"))
+# DEV-2429: the stock add-on's, frozen the same way.
+FROZEN_STOCK_XML_IDS = {
+    "ir_cron_metanow_fiscal_wtn_send",
+    "ir_cron_metanow_fiscal_wtn_poll",
+    "view_warehouse_metanow_fiscal",
+    "view_picking_type_form_metanow_fiscal",
+    "view_picking_form_metanow_fiscal",
+    "report_delivery_document_metanow_fiscal",
+    # DEV-2430: the transport invoice switch in Settings.
+    "res_config_settings_view_form_metanow_fiscal_stock",
+}
+
+
+# DEV-2437: the Point of Sale add-on's.
+FROZEN_POS_XML_IDS = {
+    "ir_cron_metanow_fiscal_pos_send",
+    "ir_cron_metanow_fiscal_pos_poll",
+    "pos_config_view_form_metanow_fiscal",
+    "view_pos_session_form_metanow_fiscal",
+}
+
+
+def manifest(module=MODULE):
+    return ast.literal_eval((module / "__manifest__.py").read_text(encoding="utf-8"))
 
 
 class InvariantTests(unittest.TestCase):
+    MODULE = MODULE
+    REPORT = "report_invoice.xml"
+
     def test_skip_readonly_check_is_never_used(self):
         banned = _token("skip_", "readonly_", "check")
-        offenders = [str(path) for path in module_files(".py", ".xml", ".csv", ".js")
+        offenders = [str(path) for path in module_files(self.MODULE, ".py", ".xml", ".csv", ".js")
                      if banned in path.read_text(encoding="utf-8")]
         ci = support.ODOO_DIR / "ci"
         offenders += [str(path) for path in ci.rglob("*") if path.is_file() and banned in path.read_text(encoding="utf-8")]
@@ -83,7 +110,7 @@ class InvariantTests(unittest.TestCase):
 
     def test_the_authority_vocabulary_stays_out_of_the_module_code(self):
         offences = []
-        for path in module_files(".py"):
+        for path in module_files(self.MODULE, ".py"):
             source = path.read_text(encoding="utf-8")
             for word in AUTHORITY_VOCABULARY:
                 if re.search(rf"\b{re.escape(word)}\b", source, re.IGNORECASE):
@@ -91,17 +118,17 @@ class InvariantTests(unittest.TestCase):
         self.assertEqual(offences, [])
 
     def test_the_printed_labels_are_the_only_authority_words_and_only_in_the_report(self):
-        report = (MODULE / "report" / "report_invoice.xml").read_text(encoding="utf-8")
-        for path in module_files(".xml"):
+        report = (self.MODULE / "report" / self.REPORT).read_text(encoding="utf-8")
+        for path in module_files(self.MODULE, ".xml"):
             source = path.read_text(encoding="utf-8")
             for word in AUTHORITY_VOCABULARY:
                 for match in re.finditer(rf"\b{re.escape(word)}\b", source, re.IGNORECASE):
-                    self.assertEqual(path.name, "report_invoice.xml", f"{path.name}: {word}")
+                    self.assertEqual(path.name, self.REPORT, f"{path.name}: {word}")
                     self.assertIn(f"<strong>{match.group(0)}:</strong>", report, "only as a printed label")
 
     def test_no_government_host_appears_in_the_module(self):
         offences = []
-        for path in module_files(".py", ".xml", ".csv"):
+        for path in module_files(self.MODULE, ".py", ".xml", ".csv"):
             source = path.read_text(encoding="utf-8")
             for host in GOVERNMENT_HOSTS:
                 if host.lower() in source.lower():
@@ -110,7 +137,7 @@ class InvariantTests(unittest.TestCase):
 
     def test_the_module_never_signs_and_never_holds_a_key(self):
         words = ("pkcs12", "private_key", "load_pem", "load_key_and_certificates", "hashlib", "md5", "sign(")
-        offences = [f"{path.name}: {word}" for path in module_files(".py")
+        offences = [f"{path.name}: {word}" for path in module_files(self.MODULE, ".py")
                     for word in words if word in path.read_text(encoding="utf-8").lower()]
         self.assertEqual(offences, [])
 
@@ -120,37 +147,63 @@ class InvariantTests(unittest.TestCase):
             "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound, efis.restore;"
             "assert 'odoo' not in sys.modules"
         )
-        subprocess.run([sys.executable, "-I", "-c", script, str(MODULE)], check=True)
+        subprocess.run([sys.executable, "-I", "-c", script, str(self.MODULE)], check=True)
 
 
 class ManifestTests(unittest.TestCase):
+    MODULE = MODULE
+    FROZEN = FROZEN_XML_IDS
+
     def test_one_major_version(self):
-        self.assertTrue(manifest()["version"].startswith("20.0."), "this tree builds the Odoo 20 module only")
+        self.assertTrue(manifest(self.MODULE)["version"].startswith("20.0."), "this tree builds the Odoo 20 module only")
 
     def test_every_data_file_exists_and_parses(self):
-        for name in manifest()["data"]:
-            path = MODULE / name
+        for name in manifest(self.MODULE)["data"]:
+            path = self.MODULE / name
             self.assertTrue(path.is_file(), name)
             if path.suffix == ".xml":
                 ElementTree.parse(path)
 
+    def test_no_two_fields_of_a_model_share_a_label(self):
+        # DEV-2461: Odoo warns at install when two fields of a model have the same label, and shows
+        # them as two indistinguishable columns in filters, exports and group-by. account.move's
+        # fields reach bank statement lines too, so a clash there shows twice.
+        import importlib
+        import pkgutil
+
+        import fake_odoo
+        from metanow_fiscalization import models as package
+
+        labels = {}
+        for info in pkgutil.iter_modules(package.__path__):
+            source = importlib.import_module(f"{package.__name__}.{info.name}")
+            for owner in vars(source).values():
+                if not isinstance(owner, type) or not getattr(owner, "_inherit", None):
+                    continue
+                for name, field in vars(owner).items():
+                    label = isinstance(field, fake_odoo.Field) and field.kwargs.get("string")
+                    if label:
+                        labels.setdefault((owner._inherit, label), []).append(name)
+        clashes = {key: names for key, names in labels.items() if len(names) > 1}
+        self.assertEqual(clashes, {})
+
     def test_no_access_file_is_needed(self):
         # The module adds fields to existing models and no model of its own, so it ships no
         # access CSV, whose file and model were renamed between Odoo 19 and 20.
-        self.assertFalse([name for name in manifest()["data"] if name.endswith(".csv")])
-        source = "\n".join(path.read_text(encoding="utf-8") for path in module_files(".py"))
+        self.assertFalse([name for name in manifest(self.MODULE)["data"] if name.endswith(".csv")])
+        source = "\n".join(path.read_text(encoding="utf-8") for path in module_files(self.MODULE, ".py"))
         self.assertNotRegex(source, r"^\s*_name\s*=", "a new model needs an access rule")
 
     def test_xml_ids_are_frozen(self):
         found = set()
-        for path in module_files(".xml"):
+        for path in module_files(self.MODULE, ".xml"):
             for element in ElementTree.parse(path).iter():
                 if element.tag in ("record", "template", "menuitem") and element.get("id"):
                     found.add(element.get("id"))
-        self.assertEqual(found, FROZEN_XML_IDS)
+        self.assertEqual(found, self.FROZEN)
 
     def test_every_python_file_compiles(self):
-        for path in module_files(".py"):
+        for path in module_files(self.MODULE, ".py"):
             compile(path.read_text(encoding="utf-8"), str(path), "exec")
 
 
@@ -158,25 +211,27 @@ class AppsStoreTests(unittest.TestCase):
     """The Odoo Apps store lists the module from branch 20.0 (README.md). It reads the icon and
     the description page from static/description, and a manifest with a price is a paid app."""
 
+    MODULE = MODULE
+
     def test_the_store_icon_is_a_png(self):
-        icon = MODULE / "static" / "description" / "icon.png"
+        icon = self.MODULE / "static" / "description" / "icon.png"
         self.assertTrue(icon.is_file())
         self.assertEqual(icon.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
 
     def test_the_store_description_page_parses(self):
-        page = MODULE / "static" / "description" / "index.html"
+        page = self.MODULE / "static" / "description" / "index.html"
         ElementTree.fromstring("<root>" + page.read_text(encoding="utf-8") + "</root>")
 
     def test_the_store_name_fits(self):
         # Vendor guidelines: explicit, 25 characters or fewer, no company name.
-        name = manifest()["name"]
+        name = manifest(self.MODULE)["name"]
         self.assertLessEqual(len(name), 25)
         self.assertNotIn("Metanow", name)
 
     def test_the_description_page_is_english_with_no_external_link_or_script(self):
         # Vendor guidelines: English, no JavaScript, links only into static/description,
         # YouTube, Teams, mailto: and skype:. Any other external link is invalidated.
-        page = (MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
+        page = (self.MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("<script", page.lower())
         self.assertNotRegex(page, r"(?i)(href|src)\s*=\s*[\"']https?://")
         self.assertNotRegex(page, r"[ëç]", "the store page must be in English")
@@ -185,22 +240,97 @@ class AppsStoreTests(unittest.TestCase):
 
     def test_every_store_image_exists_and_is_a_png(self):
         # A missing image in the manifest is a scan error, which unpublishes the repository.
-        for name in manifest()["images"]:
-            path = MODULE / name
+        for name in manifest(self.MODULE)["images"]:
+            path = self.MODULE / name
             self.assertTrue(path.is_file(), name)
             self.assertEqual(path.read_bytes()[:4], b"\x89PNG", name)
-        page = (MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
+        page = (self.MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
         for src in re.findall(r'src="([^"]+)"', page):
-            self.assertTrue((MODULE / "static" / "description" / src).is_file(), src)
+            self.assertTrue((self.MODULE / "static" / "description" / src).is_file(), src)
 
     def test_the_license_file_matches_the_manifest(self):
-        self.assertEqual(manifest()["license"], "OPL-1")
-        self.assertIn("Odoo Proprietary License v1.0", (MODULE / "LICENSE").read_text(encoding="utf-8"))
+        self.assertEqual(manifest(self.MODULE)["license"], "OPL-1")
+        self.assertIn("Odoo Proprietary License v1.0", (self.MODULE / "LICENSE").read_text(encoding="utf-8"))
 
     def test_the_module_is_free_and_licensed(self):
-        self.assertNotIn("price", manifest())
-        self.assertNotIn("currency", manifest())
-        self.assertTrue(manifest().get("license"))
+        self.assertNotIn("price", manifest(self.MODULE))
+        self.assertNotIn("currency", manifest(self.MODULE))
+        self.assertTrue(manifest(self.MODULE).get("license"))
+
+
+# DEV-2429: the stock add-on is held to the same invariants, manifest checks and store rules. It
+# ships in the same repository and branch 20.0, where the store reads every module folder.
+class StockInvariantTests(InvariantTests):
+    MODULE = STOCK
+    REPORT = "report_deliveryslip.xml"
+
+    def test_the_odoo_free_layer_imports_without_odoo(self):
+        # The add-on's request builder uses the main module's money formatting, which Odoo knows
+        # as odoo.addons.metanow_fiscalization.efis. Nothing of Odoo's ORM is loaded.
+        script = (
+            "import sys, types, importlib.util; sys.path.insert(0, sys.argv[1]);"
+            "import efis, efis.money;"
+            "addons = types.ModuleType('odoo.addons'); main = types.ModuleType('odoo.addons.metanow_fiscalization');"
+            "sys.modules.update({'odoo': types.ModuleType('odoo'), 'odoo.addons': addons,"
+            " 'odoo.addons.metanow_fiscalization': main, 'odoo.addons.metanow_fiscalization.efis': efis,"
+            " 'odoo.addons.metanow_fiscalization.efis.money': efis.money});"
+            "spec = importlib.util.spec_from_file_location('transport', sys.argv[2]);"
+            "spec.loader.exec_module(importlib.util.module_from_spec(spec));"
+            "assert not [name for name in sys.modules if name in ('odoo.models', 'odoo.fields', 'odoo.api')]"
+        )
+        subprocess.run([sys.executable, "-I", "-c", script, str(MODULE), str(STOCK / "efis" / "transport.py")], check=True)
+
+
+class StockManifestTests(ManifestTests):
+    MODULE = STOCK
+    FROZEN = FROZEN_STOCK_XML_IDS
+
+    def test_it_is_an_add_on_to_the_main_module_and_stock(self):
+        self.assertEqual(manifest(STOCK)["depends"], ["metanow_fiscalization", "stock"])
+        self.assertNotIn("stock", manifest(MODULE)["depends"], "the main module never makes a customer install Inventory")
+
+
+class StockAppsStoreTests(AppsStoreTests):
+    MODULE = STOCK
+
+
+# DEV-2437: the Point of Sale add-on, likewise. It prints nothing, so it has no report.
+class PosInvariantTests(InvariantTests):
+    MODULE = POS
+    REPORT = None
+
+    def test_the_printed_labels_are_the_only_authority_words_and_only_in_the_report(self):
+        for path in module_files(POS, ".xml"):
+            source = path.read_text(encoding="utf-8")
+            for word in AUTHORITY_VOCABULARY:
+                self.assertNotRegex(source, rf"(?i)\b{re.escape(word)}\b", f"{path.name}: {word}")
+
+    def test_the_odoo_free_layer_imports_without_odoo(self):
+        script = (
+            "import sys, types, importlib.util; sys.path.insert(0, sys.argv[1]);"
+            "import efis, efis.money;"
+            "main = types.ModuleType('odoo.addons.metanow_fiscalization');"
+            "sys.modules.update({'odoo': types.ModuleType('odoo'), 'odoo.addons': types.ModuleType('odoo.addons'),"
+            " 'odoo.addons.metanow_fiscalization': main, 'odoo.addons.metanow_fiscalization.efis': efis,"
+            " 'odoo.addons.metanow_fiscalization.efis.money': efis.money});"
+            "spec = importlib.util.spec_from_file_location('deposits', sys.argv[2]);"
+            "spec.loader.exec_module(importlib.util.module_from_spec(spec));"
+            "assert not [name for name in sys.modules if name in ('odoo.models', 'odoo.fields', 'odoo.api')]"
+        )
+        subprocess.run([sys.executable, "-I", "-c", script, str(MODULE), str(POS / "efis" / "deposits.py")], check=True)
+
+
+class PosManifestTests(ManifestTests):
+    MODULE = POS
+    FROZEN = FROZEN_POS_XML_IDS
+
+    def test_it_is_an_add_on_to_the_main_module_and_point_of_sale(self):
+        self.assertEqual(manifest(POS)["depends"], ["metanow_fiscalization", "point_of_sale"])
+        self.assertNotIn("point_of_sale", manifest(MODULE)["depends"], "the main module never makes a customer install POS")
+
+
+class PosAppsStoreTests(AppsStoreTests):
+    MODULE = POS
 
 
 def _package_tool():
@@ -232,6 +362,24 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(all(name.startswith("metanow_fiscalization/") for name in names))
         self.assertFalse([name for name in names if "__pycache__" in name or "/tests/" in name])
         self.assertFalse([name for name in names if Path(name).suffix in (".pem", ".key", ".p12", ".pfx")])
+
+    def test_the_stock_add_on_is_its_own_reproducible_zip(self):
+        # DEV-2429: each module ships alone, so a customer without Inventory never gets the add-on.
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            path, digest = self.build(first, module="metanow_fiscalization_stock", manifest=True)
+            _, again = self.build(second, module="metanow_fiscalization_stock")
+            with zipfile.ZipFile(path) as archive:
+                names = archive.namelist()
+            facts = json.loads(Path(first, "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(digest, again)
+        self.assertEqual(path.name, f"metanow_fiscalization_stock-{manifest(STOCK)['version']}.zip")
+        self.assertTrue(all(name.startswith("metanow_fiscalization_stock/") for name in names))
+        self.assertFalse([name for name in names if "__pycache__" in name])
+        self.assertEqual(facts["module"], "metanow_fiscalization_stock")
+
+    def test_only_this_repository_s_modules_are_packaged(self):
+        with tempfile.TemporaryDirectory() as out, self.assertRaises(ValueError):
+            self.build(out, module="sale")
 
     def test_no_manifest_is_written_unless_asked(self):
         with tempfile.TemporaryDirectory() as out:

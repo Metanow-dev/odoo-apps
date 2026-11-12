@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <record id="view_picking_form_metanow_fiscal" model="ir.ui.view">
+        <field name="name">stock.picking.form.metanow_fiscal</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <field name="metanow_fiscal_wtn_applies" invisible="1"/>
+                <field name="metanow_fiscal_transport_document" invisible="1"/>
+                <button name="action_metanow_fiscal_issue_wtn" type="object" class="btn-primary"
+                        string="Lësho faturën shoqëruese / Issue transfer note"
+                        invisible="not metanow_fiscal_wtn_applies or metanow_fiscal_transport_document != 'wtn' or metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected') or state in ('done', 'cancel')"
+                        confirm="Fatura shoqëruese lëshohet sot, menjëherë para nisjes së mallit, dhe nuk anulohet. Ta lëshoni? / The transfer note is issued today, immediately before the goods leave, and cannot be cancelled. Issue it?"/>
+                <!-- DEV-2430 -->
+                <button name="action_metanow_fiscal_issue_wtn" type="object" class="btn-primary"
+                        string="Lësho faturën e transportit / Issue transport invoice"
+                        invisible="not metanow_fiscal_wtn_applies or metanow_fiscal_transport_document != 'ti' or metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected') or state in ('done', 'cancel')"
+                        confirm="Fatura e transportit lëshohet sot, para nisjes së mallit, dhe nuk anulohet. Ta lëshoni? / The transport invoice is issued today, before the goods leave, and cannot be cancelled. Issue it?"/>
+            </xpath>
+            <xpath expr="//header" position="after">
+                <div class="alert alert-danger mb-0" role="alert"
+                     invisible="metanow_fiscal_wtn_state not in ('refused', 'parked', 'rejected')">
+                    <strong>Dokumenti i transportit nuk u lëshua ose u refuzua. / The transport document was not issued, or was refused.</strong>
+                    <field name="metanow_fiscal_wtn_error" readonly="1" nolabel="1" class="d-block text-break"/>
+                </div>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="metanow_fiscal_wtn" string="Dokumenti i transportit / Transport document"
+                      invisible="not metanow_fiscal_wtn_applies and not metanow_fiscal_wtn_state">
+                    <group>
+                        <group string="Transporti / Transport">
+                            <field name="metanow_fiscal_vehicle_plates" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                            <field name="metanow_fiscal_vehicle_ownership" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                            <field name="metanow_fiscal_carrier_id" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                            <field name="metanow_fiscal_goods_flammable" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                            <field name="metanow_fiscal_escort_required" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                            <field name="metanow_fiscal_destination_kind" readonly="metanow_fiscal_wtn_state in ('to_send', 'sent', 'deferred', 'registered', 'rejected')"/>
+                        </group>
+                        <group string="efis">
+                            <field name="metanow_fiscal_transport_kind"/>
+                            <field name="metanow_fiscal_wtn_state"/>
+                            <field name="metanow_fiscal_wtn_number"/>
+                            <field name="metanow_fiscal_wtn_issued_at"/>
+                            <field name="metanow_fiscal_wtn_security_code"/>
+                            <field name="metanow_fiscal_wtn_registration_code"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <!-- DEV-2429: the transfer note's number and codes, printed on the delivery slip. -->
+    <template id="report_delivery_document_metanow_fiscal" inherit_id="stock.report_delivery_document">
+        <xpath expr="//div[@id='informations']" position="after">
+            <div t-if="o.metanow_fiscal_wtn_number" class="row mb-4" name="metanow_fiscal_wtn">
+                <t t-set="metanow_ti" t-value="o.metanow_fiscal_transport_kind == 'ti'"/>
+                <div class="col-12">
+                    <strong t-if="metanow_ti">Faturë transporti / Transport invoice:</strong>
+                    <strong t-else="">Faturë shoqëruese / Transfer note:</strong>
+                    <span t-field="o.metanow_fiscal_wtn_number"/>
+                    <span t-if="o.metanow_fiscal_wtn_issued_at"> · <span t-field="o.metanow_fiscal_wtn_issued_at"/></span>
+                </div>
+                <div class="col-12">
+                    <strong t-if="metanow_ti">TIIC:</strong>
+                    <strong t-else="">NSLFSH:</strong>
+                    <span t-field="o.metanow_fiscal_wtn_security_code"/>
+                </div>
+                <div class="col-12" t-if="o.metanow_fiscal_wtn_registration_code">
+                    <strong t-if="metanow_ti">FTIC:</strong>
+                    <strong t-else="">NIVFSH:</strong>
+                    <span t-field="o.metanow_fiscal_wtn_registration_code"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

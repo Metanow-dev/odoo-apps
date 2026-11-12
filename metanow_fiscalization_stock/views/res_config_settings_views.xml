@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <!-- DEV-2430: transport invoices, off until the business turns them on. -->
+    <record id="res_config_settings_view_form_metanow_fiscal_stock" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.metanow_fiscal_stock</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="metanow_fiscalization.res_config_settings_view_form_metanow_fiscal"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='metanow_fiscal_block']" position="inside">
+                <setting string="Faturat e transportit / Transport invoices"
+                         help="Mallra që i dërgohen një personi tjetër për përpunim, ekzaminim ose riparim, pa ndryshuar pronarin. efis i lëshon vetëm kur janë ndezur në efis. / Goods sent to another person for processing, examination or repair, owner unchanged. efis issues them only where they are switched on in efis.">
+                    <field name="metanow_fiscal_ti_enabled"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

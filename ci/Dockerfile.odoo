@@ -3,4 +3,8 @@
 ARG ODOO_IMAGE=odoo:20.0
 FROM ${ODOO_IMAGE}
 COPY dist/odoo/addons/metanow_fiscalization /mnt/extra-addons/metanow_fiscalization
+# DEV-2429: the stock add-on, from its own zip, unpacked beside the main module.
+COPY dist/odoo/addons/metanow_fiscalization_stock /mnt/extra-addons/metanow_fiscalization_stock
+# DEV-2437: the Point of Sale add-on, likewise.
+COPY dist/odoo/addons/metanow_fiscalization_pos /mnt/extra-addons/metanow_fiscalization_pos
 COPY ci/post_invoice.py /ci/post_invoice.py
