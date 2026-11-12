@@ -131,6 +131,29 @@ class ManifestTests(unittest.TestCase):
             if path.suffix == ".xml":
                 ElementTree.parse(path)
 
+    def test_no_two_fields_of_a_model_share_a_label(self):
+        # DEV-2461: Odoo warns at install when two fields of a model have the same label, and shows
+        # them as two indistinguishable columns in filters, exports and group-by. account.move's
+        # fields reach bank statement lines too, so a clash there shows twice.
+        import importlib
+        import pkgutil
+
+        import fake_odoo
+        from metanow_fiscalization import models as package
+
+        labels = {}
+        for info in pkgutil.iter_modules(package.__path__):
+            source = importlib.import_module(f"{package.__name__}.{info.name}")
+            for owner in vars(source).values():
+                if not isinstance(owner, type) or not getattr(owner, "_inherit", None):
+                    continue
+                for name, field in vars(owner).items():
+                    label = isinstance(field, fake_odoo.Field) and field.kwargs.get("string")
+                    if label:
+                        labels.setdefault((owner._inherit, label), []).append(name)
+        clashes = {key: names for key, names in labels.items() if len(names) > 1}
+        self.assertEqual(clashes, {})
+
     def test_no_access_file_is_needed(self):
         # The module adds fields to existing models and no model of its own, so it ships no
         # access CSV, whose file and model were renamed between Odoo 19 and 20.
