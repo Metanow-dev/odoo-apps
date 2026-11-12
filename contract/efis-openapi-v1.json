@@ -16412,6 +16412,88 @@
         ]
       }
     },
+    "/v1/cash-deposits/{id}": {
+      "get": {
+        "operationId": "GetCashDeposit",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashDepositResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "CashDeposits"
+        ]
+      }
+    },
     "/v1/certificate-links/{token}": {
       "get": {
         "operationId": "ReadCertificateLink",
@@ -24133,6 +24215,7 @@
         ]
       },
       "post": {
+        "description": "Subscribes an endpoint to one or more of these topics: cash_deposit.refused, cash_deposit.registered, certificate.expiring, document.corrected, document.deferred, document.files_ready, document.fiscalised, document.overdue, document.rejected, document.repudiated, document.superseded, einvoice.answer_due, einvoice.received, einvoice.refused_by_buyer, errors.reported, grant.created, grant.revoked, profile.updated, transport_document.refused, transport_document.registered, transport_invoice.refused, transport_invoice.registered. Any other name is refused with 422 invalid_webhook_events.",
         "operationId": "PartnerCreateWebhook",
         "parameters": [
           {
@@ -27167,6 +27250,88 @@
         ]
       }
     },
+    "/v1/transport-documents/{id}": {
+      "get": {
+        "operationId": "GetTransportDocument",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportDocumentResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "TransportDocuments"
+        ]
+      }
+    },
     "/v1/transport-invoices": {
       "get": {
         "operationId": "ListTransportInvoices",
@@ -27368,6 +27533,88 @@
               }
             },
             "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "TransportInvoices"
+        ]
+      }
+    },
+    "/v1/transport-invoices/{id}": {
+      "get": {
+        "operationId": "GetTransportInvoice",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportInvoiceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         },
         "tags": [
@@ -27657,6 +27904,7 @@
         ]
       },
       "post": {
+        "description": "Subscribes an endpoint to one or more of these topics: cash_deposit.refused, cash_deposit.registered, certificate.expiring, document.corrected, document.deferred, document.files_ready, document.fiscalised, document.overdue, document.rejected, document.repudiated, document.superseded, einvoice.answer_due, einvoice.received, einvoice.refused_by_buyer, errors.reported, grant.created, grant.revoked, profile.updated, transport_document.refused, transport_document.registered, transport_invoice.refused, transport_invoice.registered. Any other name is refused with 422 invalid_webhook_events.",
         "operationId": "CreateWebhook",
         "parameters": [
           {

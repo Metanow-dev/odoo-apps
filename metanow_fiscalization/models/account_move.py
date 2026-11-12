@@ -157,6 +157,9 @@ class AccountMove(models.Model):
     # DEV-2443: what efis returned, also kept in the chatter, which stays when the module is
     # uninstalled. Posted once per invoice.
     metanow_fiscal_noted = fields.Boolean(copy=False, readonly=True)
+    # DEV-1704: efis posted an event about this invoice's document; the poll reads it again,
+    # whatever its state.
+    metanow_fiscal_refresh = fields.Boolean(copy=False, readonly=True, index=True)
     metanow_fiscal_restored = fields.Boolean(
         string="Rikthyer nga efis / Restored from efis", copy=False, readonly=True, index=True)
     metanow_fiscal_restore_note = fields.Text(
@@ -432,13 +435,13 @@ class AccountMove(models.Model):
     def _metanow_fiscal_poll(self):
         self.ensure_one()
         if not self.metanow_fiscal_document_id or not self._metanow_fiscal_lock():
-            return
+            return False
         try:
             client = self.company_id._metanow_fiscal_client()
             response = client.get_document(self.metanow_fiscal_document_id)
         except (efis_client.EfisUnavailable, UserError) as error:
             _logger.info("efis read of %s failed: %s", self.metanow_fiscal_document_id, error)
-            return
+            return False
         einvoice = None
         body = response.body if isinstance(response.body, dict) else {}
         # The e-invoice is exchanged only after fiscalisation, so it is read once efis says the
@@ -492,6 +495,12 @@ class AccountMove(models.Model):
 
     @api.model
     def _cron_metanow_fiscal_poll(self):
+        # DEV-1704: first the documents efis posted an event about, which may be registered
+        # already (a corrective superseded one, the buyer refused its e-invoice).
+        domain = [("metanow_fiscal_refresh", "=", True), (outcome.DOCUMENT_ID, "!=", False)]
+        for move in self.search(domain, order="id", limit=BATCH):
+            if move._metanow_fiscal_poll() is not False:
+                move.write({"metanow_fiscal_refresh": False})
         domain = [(outcome.STATE, "in", list(outcome.POLLED)), (outcome.DOCUMENT_ID, "!=", False)]
         for move in self.search(domain, order="id", limit=BATCH):
             move._metanow_fiscal_poll()
@@ -640,6 +649,15 @@ class AccountMove(models.Model):
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
         self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
         return None
+
+    @api.model
+    def _cron_metanow_fiscal_health(self):
+        """DEV-1704: the certificate's state from efis, daily and whenever efis posts that it is
+        running out; and the country profile again when efis posts that it changed."""
+        companies = self.env["res.company"].sudo().search([
+            ("metanow_fiscal_enabled", "=", True), ("metanow_fiscal_tenant", "!=", False)])
+        for company in companies:
+            company._metanow_fiscal_refresh_health()
 
     @api.model
     def _cron_metanow_fiscal_restore(self):

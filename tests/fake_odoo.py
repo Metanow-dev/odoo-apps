@@ -241,6 +241,12 @@ def install():
     exceptions = types.ModuleType("odoo.exceptions")
     exceptions.UserError = UserError
     exceptions.ValidationError = ValidationError
+    http = types.ModuleType("odoo.http")
+    # The controller base and route decorator, inert; a test sets the module's request.
+    http.Controller = type("Controller", (), {})
+    http.route = _identity_decorator
+    http.request = None
+    odoo.http = http
     tools = types.ModuleType("odoo.tools")
     # Odoo escapes the text and turns its line breaks into <br/>; the tests read the text as is.
     tools.plaintext2html = lambda text, container_tag=None, with_paragraph=True: text
@@ -256,5 +262,6 @@ def install():
         "odoo.api": api,
         "odoo.exceptions": exceptions,
         "odoo.tools": tools,
+        "odoo.http": http,
     })
     return odoo

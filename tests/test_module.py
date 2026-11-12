@@ -67,6 +67,8 @@ FROZEN_XML_IDS = {
     # DEV-2443: the job that restores fiscal values from efis, and the uninstall warning.
     "ir_cron_metanow_fiscal_restore",
     "view_base_module_uninstall_metanow_fiscal",
+    # DEV-1704: the job that reads the certificate's state from efis.
+    "ir_cron_metanow_fiscal_health",
 }
 
 
@@ -141,10 +143,22 @@ class InvariantTests(unittest.TestCase):
                     for word in words if word in path.read_text(encoding="utf-8").lower()]
         self.assertEqual(offences, [])
 
+    def test_the_only_hmac_checks_efis_webhook_signatures(self):
+        # DEV-1704 (decided 12 Nov 2026): the module checks the signature on efis's webhook posts
+        # with the secret efis gave it, and nothing else. It never signs. hmac appears in one
+        # file, and only to compare a received signature.
+        # The add-ons use none.
+        users = [path.relative_to(self.MODULE).as_posix() for path in module_files(self.MODULE, ".py")
+                 if "hmac" in path.read_text(encoding="utf-8")]
+        self.assertEqual(users, ["efis/webhooks.py"] if self.MODULE == MODULE else [])
+        if users:
+            source = (MODULE / "efis" / "webhooks.py").read_text(encoding="utf-8")
+            self.assertIn("hmac.compare_digest(", source)
+
     def test_the_odoo_free_layer_imports_without_odoo(self):
         script = (
             "import sys; sys.path.insert(0, sys.argv[1]);"
-            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound, efis.restore;"
+            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound, efis.restore, efis.webhooks;"
             "assert 'odoo' not in sys.modules"
         )
         subprocess.run([sys.executable, "-I", "-c", script, str(self.MODULE)], check=True)
