@@ -73,6 +73,10 @@
                                 <button name="action_metanow_fiscal_restore_skipped" type="object" class="btn-link"
                                         icon="oi-arrow-right"
                                         string="Faturat e lëna mënjanë / Invoices left alone"/>
+                                <button name="action_metanow_fiscal_restore_send_payments" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        confirm="Pagesat e faturave të rikthyera dërgohen te efis. Vazhdoni? / The payments of the restored invoices are sent to efis. Continue?"
+                                        string="Dërgo pagesat e faturave të rikthyera / Send the payments of restored invoices"/>
                             </div>
                         </div>
                     </setting>
