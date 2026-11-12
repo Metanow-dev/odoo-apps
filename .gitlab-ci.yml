@@ -26,7 +26,7 @@ variables:
   ODOO_SERIES: "20.0"
   # The efis version the module is tested against. Move it together with the two copies listed
   # in contract/README.md, never on its own.
-  EFIS_IMAGE: "cloud3.cloud-blueberry.com/efis/efis:daaf167ccc6582064c4f3b4d30b486a06ecfcb93"
+  EFIS_IMAGE: "cloud3.cloud-blueberry.com/efis/efis:7cfe05651059ec5c8153859dbcc2fdf5b63cb080"
   EFIS_ODOO_IMAGE: "odoo:20.0"
 
 test:
