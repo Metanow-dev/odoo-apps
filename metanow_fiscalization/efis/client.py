@@ -13,6 +13,7 @@ import urllib.request
 
 PAIR = ("POST", "/v1/pair")
 SUBMIT_DOCUMENT = ("POST", "/v1/documents")
+LIST_DOCUMENTS = ("GET", "/v1/documents")
 GET_DOCUMENT = ("GET", "/v1/documents/{id}")
 GET_PROFILE = ("GET", "/v1/profiles/{country}")
 GET_DOCUMENT_EINVOICE = ("GET", "/v1/documents/{documentId}/einvoice")
@@ -34,7 +35,7 @@ SUBMIT_CASH_DEPOSIT = ("POST", "/v1/cash-deposits")
 LIST_CASH_DEPOSITS = ("GET", "/v1/cash-deposits")
 
 ROUTES = (
-    PAIR, SUBMIT_DOCUMENT, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
+    PAIR, SUBMIT_DOCUMENT, LIST_DOCUMENTS, GET_DOCUMENT, GET_PROFILE, GET_DOCUMENT_EINVOICE, GET_REGISTRY,
     LIST_PAYMENTS_RECEIVED, RECORD_PAYMENT_RECEIVED, WITHDRAW_PAYMENT_RECEIVED,
     LIST_PAYMENT_RECORDS, CREATE_PAYMENT_RECORD,
     LIST_INBOUND, GET_INBOUND, GET_INBOUND_PDF, DECIDE_INBOUND,
@@ -114,6 +115,10 @@ class EfisClient:
         if not idempotency_key:
             raise ValueError("A document is never sent without an idempotency key.")
         return self._call(SUBMIT_DOCUMENT, {}, body=document, headers={"Idempotency-Key": idempotency_key})
+
+    def list_documents(self, after=None, limit=500):
+        """One page of every document of the business, in the order efis wrote them (DEV-2443)."""
+        return self._call(LIST_DOCUMENTS, {}, query={"limit": limit, "after": after})
 
     def get_document(self, document_id):
         return self._call(GET_DOCUMENT, {"id": document_id})

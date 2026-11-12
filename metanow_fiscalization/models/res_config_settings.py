@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 from ..efis import registry as efis_registry
 from .res_company import COMPANY_CODES
@@ -31,6 +32,28 @@ class ResConfigSettings(models.TransientModel):
     metanow_fiscal_inbound_since = fields.Date(related="company_id.metanow_fiscal_inbound_since", readonly=False)
     # Typed here and exchanged when the settings are saved. It is single-use, so it is not kept.
     metanow_fiscal_pairing_code = fields.Char(string="Kodi i çiftimit / Pairing code")
+    # DEV-2443
+    metanow_fiscal_restore_pending = fields.Boolean(related="company_id.metanow_fiscal_restore_pending")
+    metanow_fiscal_restore_summary = fields.Text(related="company_id.metanow_fiscal_restore_summary")
+
+    def action_metanow_fiscal_restore(self):
+        """Read the fiscal values back from efis into the invoices that lost them. Only reads."""
+        self.ensure_one()
+        if not self.company_id.metanow_fiscal_tenant:
+            raise UserError("Çiftoni kompaninë me efis më parë. / Pair the company with efis first.")
+        self.company_id._metanow_fiscal_restore_request()
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def action_metanow_fiscal_restore_skipped(self):
+        """The invoices the restore left alone, each with the reason on it."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Rikthimi nga efis / Restore from efis",
+            "res_model": "account.move",
+            "view_mode": "list,form",
+            "domain": [("company_id", "=", self.company_id.id), ("metanow_fiscal_restore_note", "!=", False)],
+        }
 
     def _metanow_fiscal_own_choices(self, kind):
         # The settings edit the current company, so the list is that company's alone.

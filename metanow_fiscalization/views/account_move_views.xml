@@ -28,6 +28,12 @@
                     <strong>Kjo e-faturë pret përgjigjen tuaj. / This e-invoice is waiting for your answer.</strong>
                     Përgjigjuni para / Answer before <field name="metanow_fiscal_inbound_answer_by" readonly="1" nolabel="1" class="oe_inline"/>.
                 </div>
+                <!-- DEV-2443: why "Restore from efis" left this invoice alone. -->
+                <div class="alert alert-warning mb-0" role="alert" invisible="not metanow_fiscal_restore_note">
+                    <strong>Rikthimi nga efis nuk e plotësoi këtë faturë. / Restore from efis did not fill this invoice.</strong>
+                    <field name="metanow_fiscal_restore_note" readonly="1" nolabel="1" class="d-block text-break"
+                           style="white-space: pre-wrap;"/>
+                </div>
                 <div class="alert alert-danger mb-0" role="alert"
                      invisible="metanow_fiscal_state != 'refused'">
                     <strong>efis e refuzoi këtë faturë dhe nuk shpenzoi asnjë numër. Korrigjojeni dhe postojeni përsëri.

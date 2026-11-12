@@ -64,6 +64,9 @@ FROZEN_XML_IDS = {
     "ir_cron_metanow_fiscal_payments",
     # DEV-2433: the job that reads received e-invoices.
     "ir_cron_metanow_fiscal_inbound",
+    # DEV-2443: the job that restores fiscal values from efis, and the uninstall warning.
+    "ir_cron_metanow_fiscal_restore",
+    "view_base_module_uninstall_metanow_fiscal",
 }
 
 
@@ -141,7 +144,7 @@ class InvariantTests(unittest.TestCase):
     def test_the_odoo_free_layer_imports_without_odoo(self):
         script = (
             "import sys; sys.path.insert(0, sys.argv[1]);"
-            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound;"
+            "import efis.payload, efis.client, efis.outcome, efis.profile, efis.qr, efis.registry, efis.receivables, efis.payment_records, efis.inbound, efis.restore;"
             "assert 'odoo' not in sys.modules"
         )
         subprocess.run([sys.executable, "-I", "-c", script, str(self.MODULE)], check=True)

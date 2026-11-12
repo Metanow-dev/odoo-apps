@@ -57,6 +57,25 @@
                             </div>
                         </div>
                     </setting>
+                    <!-- DEV-2443 -->
+                    <setting string="Rikthe të dhënat nga efis / Restore from efis" groups="base.group_system"
+                             invisible="not metanow_fiscal_tenant"
+                             help="Pas riinstalimit të modulit, lexon nga efis numrat fiskalë dhe kodet e faturave që i humbën, dhe i bllokon përsëri. Nuk dërgon asgjë. / After the module is reinstalled, reads from efis the fiscal numbers and codes of the invoices that lost them, and locks them again. It sends nothing.">
+                        <field name="metanow_fiscal_restore_pending" invisible="1"/>
+                        <div class="content-group">
+                            <div class="mt8" invisible="not metanow_fiscal_restore_summary">
+                                <field name="metanow_fiscal_restore_summary" style="white-space: pre-wrap;"/>
+                            </div>
+                            <div class="mt8">
+                                <button name="action_metanow_fiscal_restore" type="object" class="btn-link"
+                                        icon="oi-arrow-right" invisible="metanow_fiscal_restore_pending"
+                                        string="Rikthe të dhënat nga efis / Restore from efis"/>
+                                <button name="action_metanow_fiscal_restore_skipped" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        string="Faturat e lëna mënjanë / Invoices left alone"/>
+                            </div>
+                        </div>
+                    </setting>
                     <setting string="Kodet e regjistrimit / Registration codes">
                         <div class="content-group">
                             <!-- DEV-2436: the codes come from efis's registry; a stored code efis does
