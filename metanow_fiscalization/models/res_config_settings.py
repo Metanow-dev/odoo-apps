@@ -61,6 +61,14 @@ class ResConfigSettings(models.TransientModel):
         self.company_id._metanow_fiscal_restore_request()
         return {"type": "ir.actions.client", "tag": "reload"}
 
+    def action_metanow_fiscal_restore_send_payments(self):
+        """Send the payments of every restored invoice a person has now reviewed."""
+        self.ensure_one()
+        moves = self.env["account.move"].search([
+            ("company_id", "=", self.company_id.id), ("metanow_fiscal_payments_review", "=", True)])
+        moves.action_metanow_fiscal_send_payments()
+        return {"type": "ir.actions.client", "tag": "reload"}
+
     def action_metanow_fiscal_restore_skipped(self):
         """The invoices the restore left alone, each with the reason on it."""
         self.ensure_one()

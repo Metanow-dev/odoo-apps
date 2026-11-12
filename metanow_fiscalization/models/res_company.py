@@ -212,8 +212,12 @@ class ResCompany(models.Model):
             restored = Move.search_count(mine + [("metanow_fiscal_restored", "=", True)])
             conflicts = Move.search_count(mine + [("metanow_fiscal_restore_note", "=", REASONS[CONFLICT])])
             skipped = Move.search_count(mine + [("metanow_fiscal_restore_note", "!=", False)]) - conflicts
+            review = Move.search_count(mine + [("metanow_fiscal_payments_review", "=", True)])
             summary = (f"Rikthyer: {restored} · Lënë mënjanë: {skipped} · Në konflikt: {conflicts} "
                        f"/ Restored: {restored} · Left alone: {skipped} · In conflict: {conflicts}")
+            if review:
+                summary += (f"\nPagesat e {review} faturave nuk janë dërguar; kontrollojini dhe dërgojini. "
+                            f"/ The payments of {review} invoices have not been sent; check them, then send them.")
         self.sudo().write({"metanow_fiscal_restore_pending": False, "metanow_fiscal_restore_summary": summary})
 
     # ------------------------------------------------------------------ events (DEV-1704)
