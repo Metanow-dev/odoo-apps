@@ -90,8 +90,11 @@ def main():
          headers)
 
     pairing = call("POST", "/v1/pairing-codes", {"channel": "odoo"}, headers)
+    # DEV-2443: a second single-use code, for pairing again after the module is reinstalled.
+    again = call("POST", "/v1/pairing-codes", {"channel": "odoo"}, headers)
     print(json.dumps({
         "code": pairing["code"],
+        "reinstallCode": again["code"],
         "taxId": tax_id,
         "businessUnitCode": CODES["business-unit"],
         "operatorCode": CODES["operator"],

@@ -179,6 +179,15 @@ class Model:
         self.base_calls.append("unlink")
         return True
 
+    # mail.thread's chatter, recorded. Odoo's account.move inherits it.
+    def message_post(self, body=None, **kwargs):
+        self.__dict__.setdefault("messages", []).append(body)
+        return True
+
+    def search_count(self, domain):
+        self.env.counted = getattr(self.env, "counted", []) + [domain]
+        return self.env.counts.pop(0) if getattr(self.env, "counts", None) else 0
+
 
 class TransientModel(Model):
     def get_values(self):
@@ -190,6 +199,14 @@ class TransientModel(Model):
 
     def set_values(self):
         self.base_calls.append("set_values")
+
+    # base.module.uninstall's: the modules an uninstall removes, and the uninstall itself.
+    def _get_modules(self):
+        return [types.SimpleNamespace(name=name) for name in getattr(self, "module_names", ())]
+
+    def action_uninstall(self):
+        self.base_calls.append("action_uninstall")
+        return True
 
 
 def _identity_decorator(*args, **kwargs):
@@ -224,6 +241,10 @@ def install():
     exceptions = types.ModuleType("odoo.exceptions")
     exceptions.UserError = UserError
     exceptions.ValidationError = ValidationError
+    tools = types.ModuleType("odoo.tools")
+    # Odoo escapes the text and turns its line breaks into <br/>; the tests read the text as is.
+    tools.plaintext2html = lambda text, container_tag=None, with_paragraph=True: text
+    odoo.tools = tools
     odoo.fields = fields
     odoo.models = models
     odoo.api = api
@@ -234,5 +255,6 @@ def install():
         "odoo.models": models,
         "odoo.api": api,
         "odoo.exceptions": exceptions,
+        "odoo.tools": tools,
     })
     return odoo

@@ -29,6 +29,7 @@ company.
         "views/res_partner_views.xml",
         "views/res_country_views.xml",
         "views/res_users_views.xml",
+        "views/base_module_uninstall_views.xml",
         "report/report_invoice.xml",
     ],
     "images": [

@@ -66,3 +66,19 @@ compose --profile odoo run --rm -T \
   odoo odoo shell -d ci < ci/post_invoice.py | tee -a odoo-install.log
 
 grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not fiscalised through efis." >&2; exit 1; }
+
+# DEV-2443: uninstall through Odoo's dialog, install again, pair again, and restore from efis.
+FISCALISED="$(sed -n 's/^ODOO-INSTALL-PASSED //p' odoo-install.log | tail -n 1)"
+compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/uninstall.py | tee -a odoo-install.log
+grep -q '^ODOO-UNINSTALL-PASSED' odoo-install.log || { echo "The module was not uninstalled through the warning." >&2; exit 1; }
+compose --profile odoo run --rm -T odoo odoo -d ci -i metanow_fiscalization --stop-after-init --no-http >> odoo-install.log 2>&1 \
+  || { tail -n 100 odoo-install.log >&2; exit 1; }
+compose --profile odoo run --rm -T \
+  -e EFIS_BASE_URL=http://api:8080 \
+  -e EFIS_PAIRING_CODE="$(field reinstallCode)" \
+  -e EFIS_FISCALISED="$FISCALISED" \
+  -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)" \
+  -e EFIS_OPERATOR_CODE="$(field operatorCode)" \
+  -e EFIS_SOFTWARE_CODE="$(field softwareCode)" \
+  odoo odoo shell -d ci < ci/restore_check.py | tee -a odoo-install.log
+grep -q '^ODOO-RESTORE-PASSED' odoo-install.log || { echo "The fiscal data did not come back from efis." >&2; exit 1; }

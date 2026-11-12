@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import plaintext2html
 
 from ..efis import client as efis_client
 from ..efis import inbound as efis_inbound
@@ -13,6 +14,7 @@ from ..efis import payload as efis_payload
 from ..efis import money
 from ..efis import qr
 from ..efis import receivables
+from ..efis import restore
 from ..efis.profile import PAYMENT_METHODS
 
 _logger = logging.getLogger(__name__)
@@ -57,6 +59,13 @@ PAYMENT_REFUSALS = {
 CORRECTABLE_STATES = (outcome.REGISTERED, outcome.SUPERSEDED)
 
 BATCH = 50
+# DEV-2443: invoices restored from efis in one run of the restore job. A larger history is
+# restored over several runs, each one starting where the last stopped.
+RESTORE_BATCH = 200
+
+RESTORED_NOTE = ("Rikthyer nga efis pas riinstalimit të modulit; asgjë nuk u dërgua. "
+                 "/ Restored from efis after the module was reinstalled; nothing was sent.")
+REGISTERED_NOTE = "Regjistruar nga efis. / Registered by efis."
 
 
 class AccountMove(models.Model):
@@ -143,6 +152,13 @@ class AccountMove(models.Model):
     metanow_fiscal_inbound_pdf_pending = fields.Boolean(copy=False, readonly=True)
     metanow_fiscal_inbound_note = fields.Text(
         string="Shënim nga efis / Note from efis", copy=False, readonly=True)
+    # DEV-2443: what efis returned, also kept in the chatter, which stays when the module is
+    # uninstalled. Posted once per invoice.
+    metanow_fiscal_noted = fields.Boolean(copy=False, readonly=True)
+    metanow_fiscal_restored = fields.Boolean(
+        string="Rikthyer nga efis / Restored from efis", copy=False, readonly=True, index=True)
+    metanow_fiscal_restore_note = fields.Text(
+        string="Rikthimi nga efis / Restore from efis", copy=False, readonly=True)
     metanow_fiscal_correction_kind = fields.Selection(
         CORRECTION_KINDS,
         string="Nota e kreditit për efis / Credit note for efis",
@@ -426,12 +442,20 @@ class AccountMove(models.Model):
         # The e-invoice is exchanged only after fiscalisation, so it is read once efis says the
         # document is registered. Both answers go into the one write.
         registered = 200 <= response.status < 300 and outcome.odoo_state(body.get("state")) == outcome.REGISTERED
-        if self.metanow_fiscal_electronic and registered:
+        # DEV-2443: a restored invoice efis had not registered yet could not say whether it went as
+        # an e-invoice (efis builds the e-invoice only after registration), so it is read once here.
+        restored = self.metanow_fiscal_restored and not self.metanow_fiscal_electronic
+        extra = None
+        if (self.metanow_fiscal_electronic or restored) and registered:
             try:
                 einvoice = client.get_document_einvoice(self.metanow_fiscal_document_id)
             except efis_client.EfisUnavailable as error:
                 _logger.info("efis e-invoice read of %s failed: %s", self.metanow_fiscal_document_id, error)
-        self._metanow_fiscal_apply(outcome.poll_values, response, einvoice=einvoice)
+            if restored and einvoice is not None and einvoice.status == 200:
+                extra = {outcome.ELECTRONIC: True}
+            elif restored:
+                einvoice = None
+        self._metanow_fiscal_apply(outcome.poll_values, response, extra=extra, einvoice=einvoice)
 
     def _metanow_fiscal_apply(self, reader, response, extra=None, einvoice=None):
         try:
@@ -449,7 +473,12 @@ class AccountMove(models.Model):
             values = {outcome.STATE: outcome.PARKED, outcome.ERROR: f"conflict: {error}"}
         except ValueError as error:
             values = {outcome.ERROR: f"unreadable answer: {error}"}
+        noting = bool(values) and values.get(outcome.STATE) == outcome.REGISTERED and not self.metanow_fiscal_noted
+        if noting:
+            values["metanow_fiscal_noted"] = True
         self._metanow_fiscal_store(values)
+        if noting:
+            self._metanow_fiscal_post_note(REGISTERED_NOTE)
         if values and (values.get(outcome.STATE) in outcome.POLLED
                        or outcome.einvoice_pending(self._metanow_fiscal_current())):
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
@@ -485,6 +514,145 @@ class AccountMove(models.Model):
         self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_send")
         self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
         return True
+
+    def _metanow_fiscal_post_note(self, heading):
+        """The fiscal values as a chatter note: readable in Odoo even without the module."""
+        self.ensure_one()
+        text = restore.note(self._metanow_fiscal_current())
+        self.message_post(body=plaintext2html(f"{heading}\n{text}" if text else heading))
+
+    # ------------------------------------------------------------------ restore (DEV-2443)
+
+    def _metanow_fiscal_restore_values(self):
+        """The invoice as plain values for restore.match."""
+        self.ensure_one()
+        partner = self.commercial_partner_id
+        return {
+            "key": self.id,
+            "reference": self.name,
+            "amount_total": self.amount_total,
+            "credit_note": self.move_type == CREDIT_NOTE,
+            "currency": self.currency_id.name,
+            "buyer_identifier": partner.vat if partner else None,
+        }
+
+    @api.model
+    def _metanow_fiscal_restore_candidates(self, company):
+        """The company's posted customer invoices that carry no fiscal state at all: the ones an
+        uninstall emptied, and the ones posted before fiscalisation was on. An invoice this
+        installation queued or sent is never one of them."""
+        return self.search([
+            ("company_id", "=", company.id), ("move_type", "in", list(FISCALISED_TYPES)),
+            ("state", "=", "posted"), (outcome.STATE, "=", False), (outcome.DOCUMENT_ID, "=", False),
+        ], order="id")
+
+    @api.model
+    def _metanow_fiscal_linked(self, document_ids):
+        """The efis document ids, among these, that an Odoo invoice already stores."""
+        if not document_ids:
+            return set()
+        moves = self.search([(outcome.DOCUMENT_ID, "in", sorted(document_ids))])
+        return {move.metanow_fiscal_document_id for move in moves}
+
+    @api.model
+    def _metanow_fiscal_restore(self, company):
+        """One run of the restore for a company: read every efis document, restore at most
+        RESTORE_BATCH invoices, and note why each other one was left alone. Returns True when
+        nothing is left to restore. Only reads from efis; never sends."""
+        client = company._metanow_fiscal_client()
+
+        def read_page(after, limit):
+            response = client.list_documents(after=after, limit=limit)
+            if response.status != 200 or not isinstance(response.body, dict):
+                raise UserError(
+                    f"efis nuk dha listën e dokumenteve ({response.status}). "
+                    f"/ efis did not return the list of documents ({response.status}).")
+            return response.body
+
+        try:
+            documents = restore.pages(read_page)
+        except efis_client.EfisUnavailable as error:
+            raise UserError(f"efis nuk u përgjigj. / efis did not answer. ({error})") from error
+        invoices = {move.id: move for move in self._metanow_fiscal_restore_candidates(company)}
+        linked = self._metanow_fiscal_linked({document["id"] for document in documents if document.get("id")})
+        matches, skipped = restore.match(
+            [move._metanow_fiscal_restore_values() for move in invoices.values()], documents, linked)
+
+        notes = {}
+        for key, document in matches[:RESTORE_BATCH]:
+            notes[key] = invoices[key]._metanow_fiscal_restore_one(client, document)
+        # An invoice dated before efis's first document was never sent to it: it was posted
+        # before fiscalisation was turned on. Only the others are listed as not found.
+        days = sorted(str(document["issuedAt"])[:10] for document in documents if document.get("issuedAt"))
+        first_day = days[0] if days else None
+        for key, reason in skipped:
+            dated = invoices[key].invoice_date
+            dated = dated.isoformat() if dated else None
+            unsent = reason == restore.NO_MATCH and (first_day is None or (dated is not None and dated < first_day))
+            notes[key] = None if unsent else reason
+        for key, reason in notes.items():
+            move = invoices[key]
+            if move.metanow_fiscal_restored:
+                continue
+            text = restore.REASONS[reason] if reason else False
+            if (move.metanow_fiscal_restore_note or False) != text:
+                move.write({"metanow_fiscal_restore_note": text})
+        return len(matches) <= RESTORE_BATCH
+
+    def _metanow_fiscal_restore_one(self, client, document):
+        """Fill this invoice from its efis document in one write. Returns why it was not
+        restored, or None."""
+        self.ensure_one()
+        if not self._metanow_fiscal_lock() or self.metanow_fiscal_state or self.metanow_fiscal_document_id:
+            return None  # Another worker has it, or it was queued since the list was read.
+        try:
+            einvoice = client.get_document_einvoice(document["id"])
+        except efis_client.EfisUnavailable:
+            return restore.EINVOICE_UNREAD
+        if einvoice.status not in (200, 404):
+            return restore.EINVOICE_UNREAD
+        current = self._metanow_fiscal_current()
+        try:
+            values = outcome.document_values(current, document)
+            # 404: efis built no e-invoice. For a document not registered yet that is not certain,
+            # so the poll reads it once more when efis registers it (metanow_fiscal_restored).
+            values[outcome.ELECTRONIC] = einvoice.status == 200
+            if einvoice.status == 200:
+                values.update(outcome.einvoice_values(current, einvoice) or {})
+        except outcome.SecurityCodeConflict as error:
+            _logger.error("efis document conflicts with invoice %s on restore: %s", self.id, error)
+            self._metanow_fiscal_store({outcome.STATE: outcome.PARKED, outcome.ERROR: f"conflict: {error}"})
+            return restore.CONFLICT
+        values.update({
+            "metanow_fiscal_restored": True,
+            "metanow_fiscal_restore_note": False,
+            "metanow_fiscal_noted": True,
+            # efis's payments and payment records are read again. Both syncs read efis before
+            # they write, so nothing efis already holds is sent twice.
+            "metanow_fiscal_payments_pending": True,
+            "metanow_fiscal_payment_records_pending": True,
+        })
+        self._metanow_fiscal_store(values)
+        self._metanow_fiscal_post_note(RESTORED_NOTE)
+        if values.get(outcome.STATE) in outcome.POLLED or outcome.einvoice_pending(self._metanow_fiscal_current()):
+            self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
+        self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
+        return None
+
+    @api.model
+    def _cron_metanow_fiscal_restore(self):
+        companies = self.env["res.company"].sudo().search([("metanow_fiscal_restore_pending", "=", True)])
+        for company in companies:
+            try:
+                done = self.with_company(company).sudo()._metanow_fiscal_restore(company)
+            except UserError as error:
+                _logger.info("efis restore for company %s did not run: %s", company.id, error)
+                company._metanow_fiscal_restore_finished(str(error))
+                continue
+            if done:
+                company._metanow_fiscal_restore_finished()
+            else:
+                self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_restore")
 
     # ------------------------------------------------------------------ guards
 

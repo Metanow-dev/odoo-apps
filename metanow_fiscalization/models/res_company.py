@@ -7,6 +7,7 @@ from odoo.exceptions import UserError, ValidationError
 from ..efis import client as efis_client
 from ..efis import registry as efis_registry
 from ..efis.profile import Profile
+from ..efis.restore import CONFLICT, REASONS
 
 _logger = logging.getLogger(__name__)
 
@@ -96,6 +97,10 @@ class ResCompany(models.Model):
         copy=False,
         readonly=True,
     )
+    # DEV-2443: fiscal values read back from efis into invoices an uninstall emptied.
+    metanow_fiscal_restore_pending = fields.Boolean(copy=False, readonly=True)
+    metanow_fiscal_restore_summary = fields.Text(
+        string="Rikthimi i fundit nga efis / Last restore from efis", copy=False, readonly=True)
 
     @api.constrains(*(name for name, _ in COMPANY_CODES))
     def _check_metanow_fiscal_codes(self):
@@ -158,7 +163,37 @@ class ResCompany(models.Model):
             self._metanow_fiscal_refresh_registry()
         except UserError as error:
             _logger.warning("efis registry not read after pairing company %s: %s", self.id, error)
+        # DEV-2443: invoices that lost their fiscal values in an uninstall get them back from efis.
+        # On a company with none, the run finds nothing and only says so.
+        self._metanow_fiscal_restore_request()
         return True
+
+    def _metanow_fiscal_restore_request(self):
+        """Queue a restore from efis. It runs in the restore job, so a long history never holds
+        up the page that asked for it."""
+        self.sudo().write({
+            "metanow_fiscal_restore_pending": True,
+            "metanow_fiscal_restore_summary": "Në radhë... / Queued...",
+        })
+        cron = self.env.ref("metanow_fiscalization.ir_cron_metanow_fiscal_restore", raise_if_not_found=False)
+        if cron:
+            cron._trigger()
+
+    def _metanow_fiscal_restore_finished(self, failure=None):
+        """Say what the restore found, counted from the invoices themselves, so running it again
+        gives the same numbers."""
+        self.ensure_one()
+        if failure:
+            summary = f"Rikthimi nuk u krye. / The restore did not run.\n{failure}"
+        else:
+            Move = self.env["account.move"].sudo()
+            mine = [("company_id", "=", self.id)]
+            restored = Move.search_count(mine + [("metanow_fiscal_restored", "=", True)])
+            conflicts = Move.search_count(mine + [("metanow_fiscal_restore_note", "=", REASONS[CONFLICT])])
+            skipped = Move.search_count(mine + [("metanow_fiscal_restore_note", "!=", False)]) - conflicts
+            summary = (f"Rikthyer: {restored} · Lënë mënjanë: {skipped} · Në konflikt: {conflicts} "
+                       f"/ Restored: {restored} · Left alone: {skipped} · In conflict: {conflicts}")
+        self.sudo().write({"metanow_fiscal_restore_pending": False, "metanow_fiscal_restore_summary": summary})
 
     def _metanow_fiscal_refresh_registry(self):
         """Read the codes efis has confirmed for this business, and keep them on the company."""

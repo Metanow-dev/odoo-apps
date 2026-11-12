@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- XML IDs in this module are frozen for its life (BUILD_SPEC 10.1). Never rename one. -->
+<odoo>
+    <!-- DEV-2443: uninstalling warns and asks for a confirmation; it is never blocked. -->
+    <record id="view_base_module_uninstall_metanow_fiscal" model="ir.ui.view">
+        <field name="name">base.module.uninstall.form.metanow_fiscal</field>
+        <field name="model">base.module.uninstall</field>
+        <field name="inherit_id" ref="base.view_base_module_uninstall"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/div[1]" position="before">
+                <div class="alert alert-danger" role="alert" invisible="not metanow_fiscal_warning">
+                    <field name="metanow_fiscal_warning" readonly="1" nolabel="1" class="d-block text-break"
+                           style="white-space: pre-wrap;"/>
+                    <div class="mt8">
+                        <field name="metanow_fiscal_confirmed" nolabel="1"/>
+                        <label for="metanow_fiscal_confirmed" class="o_light_label"/>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
