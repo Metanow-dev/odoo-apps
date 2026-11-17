@@ -923,6 +923,21 @@
       },
       "BusinessProfileRequest": {
         "properties": {
+          "bankAccounts": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "issuerInVat": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "numberingAct": {
             "oneOf": [
               {
@@ -931,6 +946,18 @@
               {
                 "$ref": "#/components/schemas/NumberingActBody"
               }
+            ]
+          },
+          "sellerAddress": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sellerTown": {
+            "type": [
+              "null",
+              "string"
             ]
           },
           "usesCash": {
@@ -962,6 +989,21 @@
       },
       "BusinessProfileResponse": {
         "properties": {
+          "bankAccounts": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "issuerInVat": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "name": {
             "type": "string"
           },
@@ -990,6 +1032,18 @@
           },
           "numberingModel": {
             "type": "string"
+          },
+          "sellerAddress": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sellerTown": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "taxId": {
             "type": "string"
@@ -1175,6 +1229,41 @@
         ],
         "type": "object"
       },
+      "BuyerContactBody": {
+        "properties": {
+          "contactName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "postCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tradingName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "BuyerImportRequest": {
         "properties": {
           "buyers": {
@@ -1228,6 +1317,16 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BuyerContactBody"
+              }
             ]
           },
           "countryCode": {
@@ -1312,6 +1411,16 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BuyerContactBody"
+              }
+            ]
           },
           "countryCode": {
             "type": [
@@ -2022,6 +2131,193 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "ConsolePreferencesRequest": {
+        "properties": {
+          "invoiceType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentMethod": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "priceMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unitCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ConsoleTcrListResponse": {
+        "properties": {
+          "registerReadAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleTcrUnit"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "units",
+          "registerReadAt"
+        ],
+        "type": "object"
+      },
+      "ConsoleTcrListed": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "internalId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "internalId",
+          "valid"
+        ],
+        "type": "object"
+      },
+      "ConsoleTcrRegistration": {
+        "properties": {
+          "answeredAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorityCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deviceCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "faultCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "internalId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "internalId",
+          "state",
+          "deviceCode",
+          "faultCode",
+          "authorityCode",
+          "createdAt",
+          "answeredAt"
+        ],
+        "type": "object"
+      },
+      "ConsoleTcrRequest": {
+        "properties": {
+          "tcrCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "tcrCode"
+        ],
+        "type": "object"
+      },
+      "ConsoleTcrUnit": {
+        "properties": {
+          "consoleTcrCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "listed": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleTcrListed"
+            },
+            "type": "array"
+          },
+          "registration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConsoleTcrRegistration"
+              }
+            ]
+          },
+          "unitCode": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "unitCode",
+          "valid",
+          "consoleTcrCode",
+          "listed",
+          "registration"
+        ],
         "type": "object"
       },
       "ConsoleTransportInvoiceRequest": {
@@ -2805,6 +3101,15 @@
           "detail": {
             "type": [
               "null",
+              "string"
+            ]
+          },
+          "index": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
               "string"
             ]
           }
@@ -4398,6 +4703,31 @@
         ],
         "type": "object"
       },
+      "FxRateResponse": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "rate": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "currency",
+          "date",
+          "rate"
+        ],
+        "type": "object"
+      },
       "InvitePersonRequest": {
         "properties": {
           "email": {
@@ -4471,6 +4801,172 @@
           "code",
           "document",
           "paymentTermsDays"
+        ],
+        "type": "object"
+      },
+      "InvoiceDefaultsCode": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "consoleTcrCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "validTo": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "valid",
+          "validTo"
+        ],
+        "type": "object"
+      },
+      "InvoiceDefaultsLastUsed": {
+        "properties": {
+          "invoiceType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentMethod": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "priceMode": {
+            "default": "after",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invoiceType",
+          "paymentMethod"
+        ],
+        "type": "object"
+      },
+      "InvoiceDefaultsMine": {
+        "properties": {
+          "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unitCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "unitCode",
+          "operatorCode"
+        ],
+        "type": "object"
+      },
+      "InvoiceDefaultsResponse": {
+        "properties": {
+          "issuerInVat": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "lastUsed": {
+            "$ref": "#/components/schemas/InvoiceDefaultsLastUsed"
+          },
+          "linkedOperatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mine": {
+            "$ref": "#/components/schemas/InvoiceDefaultsMine"
+          },
+          "operators": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceDefaultsCode"
+            },
+            "type": "array"
+          },
+          "registerReadAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "seller": {
+            "$ref": "#/components/schemas/InvoiceDefaultsSeller"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceDefaultsCode"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "seller",
+          "issuerInVat",
+          "units",
+          "operators",
+          "mine",
+          "lastUsed",
+          "linkedOperatorCode",
+          "registerReadAt"
+        ],
+        "type": "object"
+      },
+      "InvoiceDefaultsSeller": {
+        "properties": {
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxId": {
+            "type": "string"
+          },
+          "town": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "town",
+          "taxId"
         ],
         "type": "object"
       },
@@ -4554,6 +5050,65 @@
           "preparedAt",
           "issuedBySchedule",
           "problem"
+        ],
+        "type": "object"
+      },
+      "InvoiceNoteListResponse": {
+        "properties": {
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/InvoiceNoteResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "notes"
+        ],
+        "type": "object"
+      },
+      "InvoiceNoteRequest": {
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ],
+        "type": "object"
+      },
+      "InvoiceNoteResponse": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "text",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -4776,6 +5331,12 @@
       },
       "ItemRequest": {
         "properties": {
+          "barcode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "code": {
             "type": [
               "null",
@@ -4791,13 +5352,43 @@
               "string"
             ]
           },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enteredWith": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "exemptionReason": {
             "type": [
               "null",
               "string"
             ]
           },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "manufacturer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ncgCode": {
             "type": [
               "null",
               "string"
@@ -4819,6 +5410,15 @@
             ]
           },
           "unitPriceAfterTax": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "unitPriceBeforeTax": {
             "format": "double",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -4844,7 +5444,19 @@
           "archived": {
             "type": "boolean"
           },
+          "barcode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "codeToSend": {
             "type": [
               "null",
               "string"
@@ -4859,6 +5471,15 @@
               "string"
             ]
           },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enteredWith": {
+            "type": "string"
+          },
           "exemptionReason": {
             "type": [
               "null",
@@ -4868,8 +5489,23 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "name": {
             "type": "string"
+          },
+          "ncgCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "taxRate": {
             "format": "double",
@@ -4890,9 +5526,26 @@
               "string"
             ]
           },
+          "unitPriceBeforeTax": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "usedOn": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
           }
         },
         "required": [
@@ -4905,7 +5558,16 @@
           "exemptionReason",
           "consumptionTaxRate",
           "archived",
-          "updatedAt"
+          "updatedAt",
+          "kind",
+          "barcode",
+          "manufacturer",
+          "ncgCode",
+          "description",
+          "unitPriceBeforeTax",
+          "enteredWith",
+          "codeToSend",
+          "usedOn"
         ],
         "type": "object"
       },
@@ -4915,6 +5577,15 @@
           "description": {
             "type": [
               "null",
+              "string"
+            ]
+          },
+          "discountPercent": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
               "string"
             ]
           },
@@ -6510,6 +7181,20 @@
         ],
         "type": "object"
       },
+      "PersonOperatorRequest": {
+        "properties": {
+          "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "operatorCode"
+        ],
+        "type": "object"
+      },
       "PersonOverviewListResponse": {
         "properties": {
           "people": {
@@ -6600,6 +7285,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "role": {
             "type": "string"
@@ -14187,6 +14878,63 @@
         ]
       }
     },
+    "/v1/business/console-tcrs": {
+      "get": {
+        "description": "DEV-2472: each business unit's cash register for eFis, the devices the authority's register lists for it as eFis last read it (the authority is not called), and the latest registration of a new one eFis asked for. Signed in (X-Session) as anyone on the business.",
+        "operationId": "ListConsoleTcrs",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTcrListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      }
+    },
     "/v1/business/invoice-drafts": {
       "get": {
         "description": "The drafts the templates' schedules prepared and that wait for a person to issue them.",
@@ -14436,6 +15184,209 @@
         },
         "tags": [
           "Invoice templates"
+        ]
+      }
+    },
+    "/v1/business/invoice-notes": {
+      "get": {
+        "operationId": "ListInvoiceNotes",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceNoteListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Invoice notes"
+        ]
+      },
+      "post": {
+        "operationId": "CreateInvoiceNote",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InvoiceNoteRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceNoteResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Invoice notes"
+        ]
+      }
+    },
+    "/v1/business/invoice-notes/{noteId}/archive": {
+      "post": {
+        "operationId": "ArchiveInvoiceNote",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "noteId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Invoice notes"
         ]
       }
     },
@@ -15380,6 +16331,83 @@
         ]
       }
     },
+    "/v1/business/items/{itemId}/delete": {
+      "post": {
+        "operationId": "DeleteItem",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Items"
+        ]
+      }
+    },
     "/v1/business/people": {
       "get": {
         "operationId": "BusinessListPeople",
@@ -15519,6 +16547,101 @@
               }
             },
             "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business people"
+        ]
+      }
+    },
+    "/v1/business/people/{userId}/operator-code": {
+      "post": {
+        "description": "DEV-2464: links a person on the business to one of its operator codes, or unlinks them with null. The invoice form then opens with that operator for them. The business's Owner only.",
+        "operationId": "BusinessSetPersonOperator",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonOperatorRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -16131,6 +17254,182 @@
         },
         "tags": [
           "Support"
+        ]
+      }
+    },
+    "/v1/business/units/{unitCode}/console-tcr": {
+      "put": {
+        "description": "DEV-2472: sets the cash register a business unit issues the console's cash invoices through. The code must be a device the authority's register lists for that unit and valid today, or one eFis registered for it. The business's Owner only.",
+        "operationId": "SetConsoleTcr",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsoleTcrRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTcrUnit"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business profile"
+        ]
+      }
+    },
+    "/v1/business/units/{unitCode}/console-tcr/registration": {
+      "post": {
+        "description": "DEV-2472: asks eFis to register a new cash register for a business unit (registerTCR): eFis's software and maintainer codes, the next free internal number for the unit, type REGULAR, valid from today. Queued and sent once by the worker; a refusal is final. The business's Owner only.",
+        "operationId": "RegisterConsoleTcr",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTcrUnit"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Business profile"
         ]
       }
     },
@@ -17390,9 +18689,157 @@
         ]
       }
     },
+    "/v1/console/fx-rate": {
+      "get": {
+        "description": "DEV-2467: the Bank of Albania's official exchange rate for a currency on a day (yyyy-mm-dd), or the latest earlier one eFis read, with the day it was published. eFis reads the bank's rates page once a working day at 13:00 in Tirana; the rate is a suggestion the invoice form offers, never enforced. 404 fx_rate_not_found when eFis holds none, or reading the rates is off (Efis:FxRates:Enabled). Signed in (X-Session) as the business's own Owner or Accountant.",
+        "operationId": "ReadOfficialExchangeRate",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
+    "/v1/console/invoice-defaults": {
+      "get": {
+        "description": "DEV-2464: what the console's invoice form opens with: the seller and the VAT answer from the Business profile, the business's units and operators as eFis last read the authority's register (the authority is not called), the unit and operator picked for this person, and what this person last picked. Signed in (X-Session) as the business's own Owner or Accountant.",
+        "operationId": "ReadConsoleInvoiceDefaults",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDefaultsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
     "/v1/console/invoices": {
       "post": {
-        "description": "Issues an invoice from the console invoice form. Signed in (X-Session) as the business's own Owner or Accountant, with the password typed again (and a current code when two-factor is on). The person's session does not submit: the console channel, a client system with its own credential, submits the document through the same path as POST /v1/documents, and its answer is returned unchanged. Idempotency-Key is passed through. On an electronic invoice the form requires paymentDueDate and einvoice.payment.accountId (the IBAN); the public submit route keeps both optional. The invoice carries efis's own recorded software code (409 platform_software_code_missing until the platform has recorded one). 503 console_form_unavailable when the deployment has not set the channel's key (Efis:Console:ChannelKey).",
+        "description": "Issues an invoice from the console invoice form. Signed in (X-Session) as the business's own Owner or Accountant, with the password typed again (and a current code when two-factor is on). The person's session does not submit: the console channel, a client system with its own credential, submits the document through the same path as POST /v1/documents, and its answer is returned unchanged. Idempotency-Key is passed through. When every payment carries its amount, efis computes none: they must add up to the lines' total, to the cent, or nothing is issued (422 payments_sum). On an electronic invoice the form requires paymentDueDate and einvoice.payment.accountId (the IBAN); the public submit route keeps both optional. The invoice carries efis's own recorded software code (409 platform_software_code_missing until the platform has recorded one). 503 console_form_unavailable when the deployment has not set the channel's key (Efis:Console:ChannelKey). A cash invoice (every payment a cash method) is issued on the cash register the Owner set for its business unit on the Business profile, whatever deviceCode the form sent, and numbered as the service numbers every cash invoice (number/year/register code); 422 cash_register_missing when the unit has none.",
         "operationId": "IssueConsoleInvoice",
         "parameters": [
           {
@@ -17586,6 +19033,82 @@
               }
             },
             "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
+    "/v1/console/preferences": {
+      "put": {
+        "description": "DEV-2464: keeps what this person last picked on the invoice form, so another device opens the same way. A value left out keeps the one kept. The unit and operator must be the business's own.",
+        "operationId": "KeepConsolePreferences",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsolePreferencesRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "tags": [
@@ -18208,7 +19731,7 @@
     },
     "/v1/documents": {
       "get": {
-        "description": "Without filters, every document of the taxpayer (DocumentListResponse). With any of state (comma-separated), issuedFrom, issuedTo (timestamps with an offset; half-open), businessUnit, limit (1-500, default 100) or after (the previous page's next), one page in the order documents were written, the same shape plus next, the cursor for the following page: the poller's read, which returns every document exactly once. Without the paging filters, mustAct=true keeps only the documents the taxpayer must act on (tenantMustAct; DEV-2423). Each item carries issuedAt, the buyer (identifier and name, or null) and the total with two decimals and its currency, as issued.",
+        "description": "Without filters, every document of the taxpayer (DocumentListResponse). With any of state (comma-separated), issuedFrom, issuedTo (timestamps with an offset; half-open), businessUnit, limit (1-500, default 100) or after (the previous page's next), one page in the order documents were written, the same shape plus next, the cursor for the following page: the poller's read, which returns every document exactly once. Without the paging filters, mustAct=true keeps only the documents the taxpayer must act on (tenantMustAct; DEV-2423). Each item carries issuedAt, the buyer (identifier and name, or null) and the total with two decimals and its currency, as issued. q finds a document by its fiscal number, security code, registration code or reference, its buyer's name or identifier, or its total (12000, 12000.00 or 12,000.00), letters in any case (DEV-2468). Without the paging filters, paidBy (comma-separated payment methods, such as COMPANY,ORDER) keeps only the documents every payment of which is by one of them: the documents a summary invoice may list.",
         "operationId": "ListDocuments",
         "parameters": [
           {
@@ -18291,6 +19814,13 @@
           {
             "in": "query",
             "name": "mustAct",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paidBy",
             "schema": {
               "type": "string"
             }
@@ -28193,6 +29723,9 @@
       "name": "Console"
     },
     {
+      "name": "Business people"
+    },
+    {
       "name": "Errors"
     },
     {
@@ -28220,9 +29753,6 @@
       "name": "Account"
     },
     {
-      "name": "Business people"
-    },
-    {
       "name": "Business profile"
     },
     {
@@ -28230,6 +29760,9 @@
     },
     {
       "name": "Buyers"
+    },
+    {
+      "name": "Invoice notes"
     },
     {
       "name": "Invoice templates"
