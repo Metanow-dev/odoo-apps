@@ -12,7 +12,7 @@ the efis repository (GitLab `efis/efis`), taken at one efis version, and must mo
 the module's requests against the OpenAPI copy, and the `install` job runs the module against
 that image.
 
-Current version: efis commit `daaf167ccc6582064c4f3b4d30b486a06ecfcb93` (develop, 2026-11-11).
+Current version: efis commit `bb279e99973708ef147aba1cf453cbe33d307437` (develop, 2026-11-13).
 
 To move to a newer efis: copy both files from the efis commit or tag, set `EFIS_IMAGE` to that
 commit's image, update the line above, and merge it to develop like any other change. Never edit

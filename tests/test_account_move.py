@@ -373,9 +373,13 @@ class EinvoiceSendTests(unittest.TestCase):
         record = move(env, company(env))
         record.search = lambda domain, order=None, limit=None: domains.append(domain) or []
         record._cron_metanow_fiscal_poll()
-        self.assertEqual(len(domains), 2)
-        self.assertIn((outcome.ELECTRONIC, "=", True), domains[1])
-        self.assertIn((outcome.EINVOICE_STATE, "not in", list(outcome.EINVOICE_FINAL)), domains[1])
+        # DEV-1704: the documents efis posted an event about, then the polled states, then the
+        # e-invoices, each in its own batch.
+        self.assertEqual(len(domains), 3)
+        self.assertIn(("metanow_fiscal_refresh", "=", True), domains[0])
+        self.assertIn((outcome.STATE, "in", list(outcome.POLLED)), domains[1])
+        self.assertIn((outcome.ELECTRONIC, "=", True), domains[2])
+        self.assertIn((outcome.EINVOICE_STATE, "not in", list(outcome.EINVOICE_FINAL)), domains[2])
 
 
 def _qr(record):

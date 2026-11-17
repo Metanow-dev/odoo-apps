@@ -66,6 +66,8 @@ RESTORE_BATCH = 200
 RESTORED_NOTE = ("Rikthyer nga efis pas riinstalimit të modulit; asgjë nuk u dërgua. "
                  "/ Restored from efis after the module was reinstalled; nothing was sent.")
 REGISTERED_NOTE = "Regjistruar nga efis. / Registered by efis."
+BACKFILLED_NOTE = ("Regjistruar nga efis më parë; të dhënat ruhen këtu që të lexohen edhe pa modulin. "
+                   "/ Registered by efis earlier; the values are kept here so they can be read without the module.")
 
 
 class AccountMove(models.Model):
@@ -157,10 +159,15 @@ class AccountMove(models.Model):
     # DEV-2443: what efis returned, also kept in the chatter, which stays when the module is
     # uninstalled. Posted once per invoice.
     metanow_fiscal_noted = fields.Boolean(copy=False, readonly=True)
+    # DEV-1704: efis posted an event about this invoice's document; the poll reads it again,
+    # whatever its state.
+    metanow_fiscal_refresh = fields.Boolean(copy=False, readonly=True, index=True)
     metanow_fiscal_restored = fields.Boolean(
         string="Rikthyer nga efis / Restored from efis", copy=False, readonly=True, index=True)
     metanow_fiscal_restore_note = fields.Text(
         string="Rikthimi nga efis / Restore from efis", copy=False, readonly=True)
+    # Restored, and its payments not sent yet: a restore only reads, so a person sends them.
+    metanow_fiscal_payments_review = fields.Boolean(copy=False, readonly=True, index=True)
     metanow_fiscal_correction_kind = fields.Selection(
         CORRECTION_KINDS,
         string="Nota e kreditit për efis / Credit note for efis",
@@ -432,13 +439,13 @@ class AccountMove(models.Model):
     def _metanow_fiscal_poll(self):
         self.ensure_one()
         if not self.metanow_fiscal_document_id or not self._metanow_fiscal_lock():
-            return
+            return False
         try:
             client = self.company_id._metanow_fiscal_client()
             response = client.get_document(self.metanow_fiscal_document_id)
         except (efis_client.EfisUnavailable, UserError) as error:
             _logger.info("efis read of %s failed: %s", self.metanow_fiscal_document_id, error)
-            return
+            return False
         einvoice = None
         body = response.body if isinstance(response.body, dict) else {}
         # The e-invoice is exchanged only after fiscalisation, so it is read once efis says the
@@ -492,6 +499,12 @@ class AccountMove(models.Model):
 
     @api.model
     def _cron_metanow_fiscal_poll(self):
+        # DEV-1704: first the documents efis posted an event about, which may be registered
+        # already (a corrective superseded one, the buyer refused its e-invoice).
+        domain = [("metanow_fiscal_refresh", "=", True), (outcome.DOCUMENT_ID, "!=", False)]
+        for move in self.search(domain, order="id", limit=BATCH):
+            if move._metanow_fiscal_poll() is not False:
+                move.write({"metanow_fiscal_refresh": False})
         domain = [(outcome.STATE, "in", list(outcome.POLLED)), (outcome.DOCUMENT_ID, "!=", False)]
         for move in self.search(domain, order="id", limit=BATCH):
             move._metanow_fiscal_poll()
@@ -629,17 +642,39 @@ class AccountMove(models.Model):
             "metanow_fiscal_restored": True,
             "metanow_fiscal_restore_note": False,
             "metanow_fiscal_noted": True,
-            # efis's payments and payment records are read again. Both syncs read efis before
-            # they write, so nothing efis already holds is sent twice.
-            "metanow_fiscal_payments_pending": True,
-            "metanow_fiscal_payment_records_pending": True,
+            # A restore only reads (decided 12 Nov 2026). The invoice's payments are not sent:
+            # a person reviews what came back, then sends them (action_metanow_fiscal_send_payments).
+            "metanow_fiscal_payments_review": self.move_type == "out_invoice",
         })
         self._metanow_fiscal_store(values)
         self._metanow_fiscal_post_note(RESTORED_NOTE)
         if values.get(outcome.STATE) in outcome.POLLED or outcome.einvoice_pending(self._metanow_fiscal_current()):
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_poll")
-        self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
         return None
+
+    @api.model
+    def _cron_metanow_fiscal_health(self):
+        """DEV-1704: the certificate's state from efis, daily and whenever efis posts that it is
+        running out; and the country profile again when efis posts that it changed."""
+        companies = self.env["res.company"].sudo().search([
+            ("metanow_fiscal_enabled", "=", True), ("metanow_fiscal_tenant", "!=", False)])
+        for company in companies:
+            company._metanow_fiscal_refresh_health()
+
+    @api.model
+    def _metanow_fiscal_backfill_notes(self):
+        """One chatter note per invoice efis registered before notes existed (decided 12 Nov
+        2026): the chatter stays when the module is uninstalled, so an upgrade before an uninstall
+        keeps every registered invoice's values readable. Reads nothing from efis and sends
+        nothing. Returns how many notes it posted."""
+        domain = [(outcome.DOCUMENT_ID, "!=", False), (outcome.STATE, "in", [outcome.REGISTERED, outcome.SUPERSEDED]),
+                  ("metanow_fiscal_noted", "=", False)]
+        posted = 0
+        for move in self.search(domain, order="id"):
+            move.write({"metanow_fiscal_noted": True})
+            move._metanow_fiscal_post_note(BACKFILLED_NOTE)
+            posted += 1
+        return posted
 
     @api.model
     def _cron_metanow_fiscal_restore(self):
@@ -718,7 +753,10 @@ class AccountMove(models.Model):
         """Odoo's payments on these invoices changed: send them to efis on the next pass."""
         invoices = self.filtered(lambda move: move.move_type == "out_invoice" and move.company_id.metanow_fiscal_enabled)
         if invoices:
-            invoices.sudo().write({"metanow_fiscal_payments_pending": True, "metanow_fiscal_payment_records_pending": True})
+            # A payment a person registers or undoes is theirs to send; a restored invoice's review
+            # ends with it.
+            invoices.sudo().write({"metanow_fiscal_payments_pending": True, "metanow_fiscal_payment_records_pending": True,
+                                   "metanow_fiscal_payments_review": False})
             self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
 
     def _metanow_fiscal_wanted_payments(self):
@@ -855,7 +893,8 @@ class AccountMove(models.Model):
         """Send this invoice's payments to efis again, after a person has fixed what was wrong."""
         for move in self:
             if move.move_type == "out_invoice":
-                move.write({"metanow_fiscal_payments_pending": True, "metanow_fiscal_payment_records_pending": True})
+                move.write({"metanow_fiscal_payments_pending": True, "metanow_fiscal_payment_records_pending": True,
+                            "metanow_fiscal_payments_review": False})
         self._metanow_fiscal_trigger("metanow_fiscalization.ir_cron_metanow_fiscal_payments")
         return True
 

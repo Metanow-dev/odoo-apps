@@ -57,6 +57,24 @@
                             </div>
                         </div>
                     </setting>
+                    <!-- DEV-1704 -->
+                    <setting string="Njoftimet nga efis / Events from efis" groups="base.group_system"
+                             invisible="not metanow_fiscal_tenant"
+                             help="efis njofton Odoo kur një faturë ndryshon gjendje, kur zëvendësohet nga një korrigjim ose kur certifikata po skadon. Odoo lexon përsëri nga efis. / efis tells Odoo when an invoice changes state, when a correction replaces it, or when the certificate is running out. Odoo reads it again from efis.">
+                        <div class="content-group">
+                            <div class="alert alert-warning mt8" role="alert" invisible="not metanow_fiscal_certificate_notice">
+                                <field name="metanow_fiscal_certificate_notice"/>
+                            </div>
+                            <div class="mt8" invisible="not metanow_fiscal_webhook_status">
+                                <field name="metanow_fiscal_webhook_status" style="white-space: pre-wrap;"/>
+                            </div>
+                            <div class="mt8">
+                                <button name="action_metanow_fiscal_register_webhook" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        string="Regjistro përsëri te efis / Register with efis again"/>
+                            </div>
+                        </div>
+                    </setting>
                     <!-- DEV-2443 -->
                     <setting string="Rikthe të dhënat nga efis / Restore from efis" groups="base.group_system"
                              invisible="not metanow_fiscal_tenant"
@@ -73,6 +91,10 @@
                                 <button name="action_metanow_fiscal_restore_skipped" type="object" class="btn-link"
                                         icon="oi-arrow-right"
                                         string="Faturat e lëna mënjanë / Invoices left alone"/>
+                                <button name="action_metanow_fiscal_restore_send_payments" type="object" class="btn-link"
+                                        icon="oi-arrow-right"
+                                        confirm="Pagesat e faturave të rikthyera dërgohen te efis. Vazhdoni? / The payments of the restored invoices are sent to efis. Continue?"
+                                        string="Dërgo pagesat e faturave të rikthyera / Send the payments of restored invoices"/>
                             </div>
                         </div>
                     </setting>

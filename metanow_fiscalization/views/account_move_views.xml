@@ -97,9 +97,15 @@
                            invisible="move_type != 'out_invoice'">
                         <field name="metanow_fiscal_payments_pending"/>
                         <field name="metanow_fiscal_payments_error" invisible="not metanow_fiscal_payments_error"/>
+                        <!-- DEV-2443: a restored invoice's payments wait for a person to send them. -->
+                        <div colspan="2" class="text-muted" invisible="not metanow_fiscal_payments_review">
+                            Rikthyer nga efis: pagesat nuk janë dërguar. Kontrollojini, pastaj dërgojini.
+                            / Restored from efis: the payments have not been sent. Check them, then send them.
+                        </div>
+                        <field name="metanow_fiscal_payments_review" invisible="1"/>
                         <button name="action_metanow_fiscal_send_payments" type="object" class="btn-link" colspan="2"
                                 string="Dërgo pagesat te efis përsëri / Send the payments to efis again"
-                                invisible="not metanow_fiscal_payments_error"
+                                invisible="not metanow_fiscal_payments_error and not metanow_fiscal_payments_review"
                                 groups="account.group_account_invoice"/>
                     </group>
                     <!-- DEV-2434: Instruction 24 records of this e-invoice's cash payments. -->

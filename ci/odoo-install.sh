@@ -31,7 +31,9 @@ EFIS_POSTGRES_PASSWORD="$(random)"
 EFIS_PROVISIONING_KEY="$(random)"
 EFIS_ADMIN_EMAIL="admin-$(random | cut -c1-8)@example.invalid"
 EFIS_ADMIN_PASSWORD="$(random)"
-export EFIS_POSTGRES_PASSWORD EFIS_PROVISIONING_KEY EFIS_ADMIN_EMAIL EFIS_ADMIN_PASSWORD
+# DEV-1704: efis answers its webhook routes only with a key to derive the endpoints' secrets.
+EFIS_WEBHOOKS_KEY="$(random)"
+export EFIS_POSTGRES_PASSWORD EFIS_PROVISIONING_KEY EFIS_ADMIN_EMAIL EFIS_ADMIN_PASSWORD EFIS_WEBHOOKS_KEY
 
 # One compose project per job. When the dind service does not come up, jobs fall back to the
 # runner's shared daemon, and a fixed project name let two concurrent jobs recreate and tear down
@@ -73,6 +75,10 @@ compose --profile odoo run --rm -T \
   odoo odoo shell -d ci < ci/post_invoice.py | tee -a odoo-install.log
 
 grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not fiscalised through efis." >&2; exit 1; }
+
+# DEV-1704: registering for efis's events, and the certificate's state, against the real efis.
+compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/webhook_check.py | tee -a odoo-install.log
+grep -q '^ODOO-WEBHOOK-PASSED' odoo-install.log || { echo "The module did not register for efis's events." >&2; exit 1; }
 
 # DEV-2443: uninstall through Odoo's dialog, install again, pair again, and restore from efis.
 FISCALISED="$(sed -n 's/^ODOO-INSTALL-PASSED //p' odoo-install.log | tail -n 1)"

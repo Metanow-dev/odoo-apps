@@ -1,6 +1,7 @@
 """DEV-2443: fiscal values read back from efis after the module was uninstalled and reinstalled."""
 
 import unittest
+from types import SimpleNamespace
 from datetime import date
 from unittest import mock
 
@@ -156,8 +157,10 @@ class RestoreRunTests(unittest.TestCase):
         self.assertEqual(written[outcome.ISSUED_AT], item()["issuedAt"])
         self.assertIs(written[outcome.ELECTRONIC], False)
         self.assertTrue(written["metanow_fiscal_restored"])
-        self.assertTrue(written["metanow_fiscal_payments_pending"])
-        self.assertTrue(written["metanow_fiscal_payment_records_pending"])
+        # A restore only reads: the payments wait for a person (decided 12 Nov 2026).
+        self.assertTrue(written["metanow_fiscal_payments_review"])
+        self.assertNotIn("metanow_fiscal_payments_pending", written)
+        self.assertNotIn("metanow_fiscal_payment_records_pending", written)
         self.assertTrue(record._metanow_fiscal_locked())
         with self.assertRaises(fake_odoo.UserError):
             record.button_draft()
@@ -167,7 +170,7 @@ class RestoreRunTests(unittest.TestCase):
         # Only reads: the list and the e-invoice, never a POST.
         self.assertEqual([request["method"] for request in opener.requests], ["GET", "GET"])
         self.assertIn("/v1/documents?limit=500", opener.requests[0]["url"])
-        self.assertEqual(env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_payments"].count, 1)
+        self.assertEqual(env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_payments"].count, 0)
 
     def test_an_e_invoice_comes_back_with_its_state_and_code(self):
         env = restore_env()
@@ -360,3 +363,86 @@ class UninstallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PaymentReviewTests(unittest.TestCase):
+    def test_a_restored_credit_note_has_no_payments_to_review(self):
+        env = restore_env()
+        opener = support.FakeOpener((200, {"documents": [item(clientReference="RINV/2026/00001", total="-240.00")]}),
+                                    (404, None))
+        record = emptied(env, company(env, opener=opener), name="RINV/2026/00001", move_type="out_refund")
+        RestoreRunTests.run_with(None, record)
+        self.assertIs(record.metanow_fiscal_payments_review, False)
+
+    def test_sending_the_payments_ends_the_review_and_queues_both_syncs(self):
+        env = restore_env()
+        record = move(env, company(env), metanow_fiscal_payments_review=True, metanow_fiscal_restored=True)
+        record.action_metanow_fiscal_send_payments()
+        self.assertEqual(record.writes[-1], {"metanow_fiscal_payments_pending": True,
+                                             "metanow_fiscal_payment_records_pending": True,
+                                             "metanow_fiscal_payments_review": False})
+        self.assertEqual(env.refs["metanow_fiscalization.ir_cron_metanow_fiscal_payments"].count, 1)
+
+    def test_the_summary_says_how_many_invoices_wait_for_their_payments(self):
+        env = restore_env()
+        env.models["account.move"] = account_move_module.AccountMove(env)
+        env.counts = [3, 0, 3, 2]
+        owner = company(env, metanow_fiscal_restore_pending=True)
+        owner._metanow_fiscal_restore_finished()
+        self.assertIn("The payments of 2 invoices have not been sent", owner.metanow_fiscal_restore_summary)
+
+
+class BackfillTests(unittest.TestCase):
+    def registered(self, env, owner, **values):
+        values = dict(dict(metanow_fiscal_document_id=DOCUMENT, metanow_fiscal_state=outcome.REGISTERED,
+                           metanow_fiscal_number="1/2026/bb123bb123", metanow_fiscal_security_code=support.SECURITY_CODE,
+                           metanow_fiscal_registration_code="r-1"), **values)
+        return move(env, owner, **values)
+
+    def test_each_registered_invoice_without_a_note_gets_one_and_nothing_is_sent(self):
+        env = restore_env()
+        opener = support.FakeOpener()
+        owner = company(env, opener=opener)
+        first, second = self.registered(env, owner), self.registered(env, owner, id=43)
+        domains = []
+        first.search = lambda domain, order=None, limit=None: domains.append(domain) or [first, second]
+        self.assertEqual(first._metanow_fiscal_backfill_notes(), 2)
+        for record in (first, second):
+            self.assertEqual(record.writes, [{"metanow_fiscal_noted": True}])
+            self.assertEqual(len(record.messages), 1)
+            self.assertIn("Registered by efis earlier", record.messages[0])
+            self.assertIn(support.SECURITY_CODE, record.messages[0])
+        self.assertIn(("metanow_fiscal_noted", "=", False), domains[0])
+        self.assertIn((outcome.STATE, "in", [outcome.REGISTERED, outcome.SUPERSEDED]), domains[0])
+        self.assertEqual(opener.requests, [])
+
+    def test_with_every_invoice_noted_nothing_is_posted(self):
+        env = restore_env()
+        record = self.registered(env, company(env), metanow_fiscal_noted=True)
+        record.search = lambda domain, order=None, limit=None: []
+        self.assertEqual(record._metanow_fiscal_backfill_notes(), 0)
+
+    def test_the_upgrade_runs_the_backfill_and_a_new_install_does_not(self):
+        import importlib.util
+        path = support.MODULE_DIR / "migrations" / "20.0.1.1.0" / "post-migrate.py"
+        spec = importlib.util.spec_from_file_location("post_migrate_2443", path)
+        script = importlib.util.module_from_spec(spec)
+        calls = []
+        fake_api = type("api", (), {"Environment": staticmethod(lambda cr, uid, context: {"account.move": SimpleNamespace(
+            _metanow_fiscal_backfill_notes=lambda: calls.append(uid))})})
+        import odoo
+        odoo.api_backup, odoo.SUPERUSER_ID_backup = odoo.api, getattr(odoo, "SUPERUSER_ID", None)
+        odoo.api, odoo.SUPERUSER_ID = fake_api, 1
+        try:
+            spec.loader.exec_module(script)
+            script.migrate(None, None)
+            self.assertEqual(calls, [])
+            script.migrate(None, "20.0.1.0.3")
+            self.assertEqual(calls, [1])
+        finally:
+            odoo.api = odoo.api_backup
+            if odoo.SUPERUSER_ID_backup is None:
+                del odoo.SUPERUSER_ID
+            else:
+                odoo.SUPERUSER_ID = odoo.SUPERUSER_ID_backup
+            del odoo.api_backup, odoo.SUPERUSER_ID_backup
