@@ -96,7 +96,10 @@ services:
       # signer the worker trusts (BUILD_SPEC 4.6). The same three settings as the worker's.
       EFIS_GATEWAY_SIGNER: "${EFIS_GATEWAY_SIGNER:-authority}"
       EFIS_AUTHORITY_SIGNER_CN: "${EFIS_AUTHORITY_SIGNER_CN:-GDT eFiskalizimi}"
-      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-AKSHI}"
+      # DEV-2447: the issuer the authority's TEST host signs with (CN=NAIS Class 3 Certification
+      # Authority, O=NAIS, C=AL; seen 11 Nov 2026). NAIS is AKSHI's English name; the match is
+      # on text, so "AKSHI" refused every answer. Production's issuer is confirmed before go-live.
+      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-NAIS}"
       # The signer's socket. The api holds no key; it asks the signer, over a socket only
       # the containers that mount this volume can reach.
       Signer__Socket: /run/efis-signer/signer.sock
@@ -153,7 +156,10 @@ services:
       # GDT eFiskalizimi". Configuration, not source, like the production address. Check both
       # against the first real answer (DEV-1695) before go-live.
       EFIS_AUTHORITY_SIGNER_CN: "${EFIS_AUTHORITY_SIGNER_CN:-GDT eFiskalizimi}"
-      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-AKSHI}"
+      # DEV-2447: the issuer the authority's TEST host signs with (CN=NAIS Class 3 Certification
+      # Authority, O=NAIS, C=AL; seen 11 Nov 2026). NAIS is AKSHI's English name; the match is
+      # on text, so "AKSHI" refused every answer. Production's issuer is confirmed before go-live.
+      EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-NAIS}"
       # The contract a request is validated against before it is sent: the host's (DEV-1815).
       Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
       Signer__Socket: /run/efis-signer/signer.sock
