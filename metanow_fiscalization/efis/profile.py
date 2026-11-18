@@ -12,6 +12,8 @@ PAYMENT_METHODS = "paymentMethods"
 CURRENCIES = "payments.currency"
 COUNTRY_CODES = "buyer.countryCode"
 IDENTIFIER_TYPES = "buyer.identifierType"
+# DEV-2444: the narrower set a transport document's carrier may be named by.
+CARRIER_ID_TYPES = "carrier.idType"
 EXEMPTIONS = "lines.exemptionReason"
 TAX_RATES = "lines.taxRate"
 

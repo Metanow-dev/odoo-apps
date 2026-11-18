@@ -33,7 +33,8 @@ def _alias_odoo_addons():
     import metanow_fiscalization  # noqa: F401
     addons = sys.modules.setdefault("odoo.addons", types.ModuleType("odoo.addons"))
     sys.modules["odoo"].addons = addons
-    for name in ("", ".efis", ".efis.money", ".efis.registry", ".efis.client", ".efis.outcome", ".efis.payload"):
+    for name in ("", ".efis", ".efis.money", ".efis.registry", ".efis.client", ".efis.outcome", ".efis.payload",
+                 ".efis.profile", ".efis.inbound"):
         module = importlib.import_module("metanow_fiscalization" + name)
         sys.modules["odoo.addons.metanow_fiscalization" + name] = module
     addons.metanow_fiscalization = sys.modules["odoo.addons.metanow_fiscalization"]
@@ -69,6 +70,11 @@ PROFILE_DOCUMENT = {
         {"field": "seller.identifierType, buyer.identifierType", "source": "test", "values": [
             {"code": "tax", "description": None, "flags": {"domestic": True}},
             {"code": "passport", "description": None, "flags": {"domestic": False}},
+        ]},
+        # DEV-2444: the narrower set a transport document's carrier may be named by.
+        {"field": "carrier.idType", "source": "test", "values": [
+            {"code": "tax", "description": None, "flags": {"domestic": True}},
+            {"code": "personal_id", "description": None, "flags": {"domestic": True}},
         ]},
         {"field": "lines.exemptionReason", "source": "test", "values": [
             {"code": "type_1", "description": None, "flags": {"requiresZeroRate": True}},

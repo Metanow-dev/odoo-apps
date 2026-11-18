@@ -18,7 +18,9 @@ working guess for the accountant (DEV-2441) and the helpdesk (DEV-2036).
 
 import re
 
+from odoo.addons.metanow_fiscalization.efis import inbound as efis_inbound
 from odoo.addons.metanow_fiscalization.efis import money
+from odoo.addons.metanow_fiscalization.efis.profile import CARRIER_ID_TYPES
 
 # The two documents a transfer can issue.
 TRANSFER_NOTE = "wtn"
@@ -56,7 +58,7 @@ def _text(value):
     return text or None
 
 
-def build(note, config, kind=TRANSFER_NOTE):
+def build(note, config, kind=TRANSFER_NOTE, profile=None):
     """Return the request body, or raise TransportInvalid with every problem found."""
     rules = RULES[kind]
     problems = []
@@ -115,13 +117,8 @@ def build(note, config, kind=TRANSFER_NOTE):
     if not all(issuer_body.values()):
         problems.append("Kompania ka nevojë për emër, adresë dhe qytet. / The company needs a name, an address and a town.")
 
-    if note.get("carrier") is not None:
-        # efis takes the carrier's identifier type only in the authority's own codes, which this
-        # module never writes (InvariantTests). Until efis accepts a neutral one, as it does for a
-        # buyer, a note with another carrier is issued from efis's console.
-        problems.append(
-            "Një transportues tjetër nga kompania nuk mbështetet ende nga Odoo; lëshojeni faturën shoqëruese nga efis. "
-            "/ A carrier other than the company is not supported from Odoo yet; issue the document from efis.")
+    carrier, carrier_problems = _carrier(note.get("carrier"), profile)
+    problems.extend(carrier_problems)
 
     goods = []
     for number, item in enumerate(note.get("goods") or [], start=1):
@@ -162,12 +159,65 @@ def build(note, config, kind=TRANSFER_NOTE):
         "goodsFlammable": bool(note.get("flammable")),
         "escortRequired": bool(note.get("escort")),
         "issuer": issuer_body,
-        "carrier": None,
+        "carrier": carrier,
         "goods": goods,
     }
     if kind == TRANSPORT_INVOICE:
         body["receiver"] = receiver
     return body
+
+
+def _carrier(given, profile):
+    """Whoever carries the goods when the company does not (Law 87/2019 Art. 40(1)(h)).
+
+    DEV-2444: efis names the carrier's identifier type in its own words and publishes the ones it
+    accepts under carrier.idType in the country profile, so the list is read here, never written.
+    A partner with no type set means efis's default, a domestic tax number, as it does for a buyer
+    (res.partner.metanow_fiscal_identifier_type). A carrier efis cannot be told about -- a foreign
+    firm named by its VAT number, say -- is refused here, before anything is sent.
+    """
+    if not given:
+        return None, []
+    if profile is None:
+        return None, [
+            "Profili i vendit nga efis nuk është marrë ende; kontrolloni konfigurimin. "
+            "/ efis's country profile has not been fetched yet; run the configuration check.",
+        ]
+    accepted = profile.codes(CARRIER_ID_TYPES)
+    if not accepted:
+        return None, [
+            "Profili i vendit nga efis nuk ka llojet e identifikuesit të transportuesit; përditësojeni profilin. "
+            "/ efis's country profile carries no carrier identifier types; refresh it.",
+        ]
+
+    problems = []
+    id_type = _text(given.get("id_type")) or "tax"
+    if id_type not in accepted:
+        problems.append(
+            f"efis nuk e pranon llojin e identifikuesit {id_type} për transportuesin. "
+            f"/ efis does not accept the carrier identifier type {id_type}.")
+    number = _text(given.get("id_number"))
+    if not number:
+        problems.append(
+            "Transportuesi ka nevojë për numër identifikimi. / The carrier needs an identification number.")
+    name = _text(given.get("name"))
+    if not name:
+        problems.append("Transportuesi ka nevojë për emër. / The carrier needs a name.")
+    if problems:
+        return None, problems
+
+    # The number as efis compares one: without spaces, and a tax number upper case and without a
+    # country prefix in front of it, as the receiver's is.
+    compact = "".join(number.split())
+    body = {
+        "idType": id_type,
+        "idNumber": efis_inbound.tax_id(compact) if id_type == "tax" else compact,
+        "name": name,
+    }
+    for key, value in (("address", _text(given.get("address"))), ("town", _text(given.get("town")))):
+        if value is not None:
+            body[key] = value
+    return body, []
 
 
 def _place(place, kinds, label):
