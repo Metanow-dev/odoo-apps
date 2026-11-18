@@ -38,6 +38,10 @@ AUTHORITY_VOCABULARY = [
     _token("fault", "Code"), _token("Is", "Subseq", "Deliv"),
 ]
 
+# DEV-1873: the licences apps.odoo.com/apps/upload lists. Anything else is read as proprietary.
+STORE_LICENCES = ("GPL-3", "AGPL-3", "LGPL-3", "OPL-1", "OEEL-1",
+                  "Other OSI approved licence", "Other proprietary")
+
 GOVERNMENT_HOSTS = [
     _token("tatime", ".gov.", "al"), _token("akshi", ".gov"), _token("e-", "albania"), _token("efis", "kalizimi"),
 ]
@@ -270,6 +274,59 @@ class AppsStoreTests(unittest.TestCase):
         self.assertNotIn("price", manifest(self.MODULE))
         self.assertNotIn("currency", manifest(self.MODULE))
         self.assertTrue(manifest(self.MODULE).get("license"))
+
+    # DEV-1873: the rest of the vendor guidelines, walked point by point on 18 Nov 2026.
+
+    def test_the_license_is_one_the_store_knows(self):
+        # The upload page's list. A value outside it is read as "Other Proprietary".
+        self.assertIn(manifest(self.MODULE)["license"], STORE_LICENCES)
+
+    def test_the_version_is_the_series_then_major_minor_bugfix(self):
+        # Vendor guidelines: the version includes the Odoo version and is major.minor.bugfix.
+        version = manifest(self.MODULE)["version"]
+        self.assertRegex(version, r"^20\.0\.\d+\.\d+\.\d+$", version)
+        self.assertGreaterEqual(tuple(int(part) for part in version.split(".")[2:]), (1, 0, 0),
+                                "a version below 1.0 tells the store the module is beta")
+
+    def test_the_module_is_a_folder_at_the_repository_root(self):
+        # The store reads every module folder of the branch; one folder per module, at the root.
+        self.assertEqual(self.MODULE.parent, support.REPO)
+        self.assertTrue((self.MODULE / "__manifest__.py").is_file())
+
+    def test_the_store_page_advertises_the_external_service_and_what_is_sent(self):
+        # Vendor guidelines: an external service is advertised, and data a module sends is
+        # declared and opted into. efis is that service; pairing is the opt-in.
+        page = (self.MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("external service", page)
+        self.assertIn("efis account", page)
+        self.assertRegex(page, r"(?i)nothing (leaves Odoo|is sent) until")
+
+    def test_the_description_page_carries_no_script_frame_or_modal(self):
+        # Vendor guidelines: no JavaScript, no static tags or widgets, no modals, and styling
+        # only through Bootstrap classes and colour, font, margin, padding and border.
+        page = (self.MODULE / "static" / "description" / "index.html").read_text(encoding="utf-8").lower()
+        for tag in ("<script", "<iframe", "<style", "<form", "<object", "<embed", "modal", "<t "):
+            self.assertNotIn(tag, page, tag)
+        for style in re.findall(r'style\s*=\s*"([^"]*)"', page):
+            for declaration in (part for part in style.split(";") if part.strip()):
+                name = declaration.split(":")[0].strip()
+                self.assertTrue(name.startswith(("color", "font", "margin", "padding", "border")),
+                                f"{name} is not a style the store keeps")
+
+    def test_the_cover_is_the_first_image_and_the_big_screenshot_is_named_for_it(self):
+        # The store's thumbnail is the first image; its big screenshot is the first image whose
+        # name ends in _screenshot. A module that lists none scores lower but is still published.
+        images = manifest(self.MODULE)["images"]
+        if not images:
+            return
+        self.assertTrue(Path(images[0]).name.startswith("cover"), images[0])
+        self.assertTrue([name for name in images if Path(name).stem.endswith("_screenshot")],
+                        "no image is named so the store shows it as the big screenshot")
+
+    def test_no_documentation_file_the_store_would_read_instead(self):
+        # doc/index.rst is loaded automatically and must be pure rst; a non-HTML description
+        # scores lower. The store page is the HTML one, so there is no rst to go wrong.
+        self.assertFalse(list(self.MODULE.rglob("*.rst")))
 
 
 # DEV-2429: the stock add-on is held to the same invariants, manifest checks and store rules. It
