@@ -261,9 +261,9 @@ class HealthTests(unittest.TestCase):
         env.refs["base.group_system"] = group
         return record, scheduled
 
-    def health(self, status, until="2026-12-01T00:00:00Z"):
-        return (200, {"tenantId": "shembull", "status": "attention", "attention": [],
-                      "certificate": {"status": status, "notAfter": until, "daysLeft": 19}})
+    def health(self, status, until="2026-12-01T00:00:00Z", **extra):
+        return (200, dict({"tenantId": "shembull", "status": "attention", "attention": [],
+                           "certificate": {"status": status, "notAfter": until, "daysLeft": 19}}, **extra))
 
     def test_an_expiring_certificate_is_shown_and_each_admin_gets_one_to_do(self):
         env, _ = self.health_env()
@@ -299,6 +299,46 @@ class HealthTests(unittest.TestCase):
         owner._metanow_fiscal_refresh_health()
         self.assertIn("no signing certificate", owner._metanow_fiscal_certificate_notice())
         self.assertEqual(scheduled, [])
+
+    # DEV-2451: efis builds an e-invoice only where its platform has the e-invoice service, and
+    # refuses an invoice marked electronic where it does not. The module reads that from the same
+    # health read it already makes, with the credential it already has.
+    def test_a_platform_without_e_invoices_is_read_and_said_without_changing_the_choice(self):
+        env, _ = self.health_env()
+        owner, _ = self.owner(env, self.health("valid", einvoicing="off"))
+        owner._metanow_fiscal_refresh_health()
+        self.assertEqual(owner.metanow_fiscal_einvoice_platform, "off")
+        owner.metanow_fiscal_einvoice = True
+        self.assertIs(owner._metanow_fiscal_einvoice_on(), False)
+        self.assertIn("not switched on", owner._metanow_fiscal_einvoice_notice())
+        # The person's own setting is untouched: what was written is the platform's word only.
+        self.assertIs(owner.metanow_fiscal_einvoice, True)
+
+    def test_a_platform_with_e_invoices_says_nothing_and_e_invoices_go_out(self):
+        env, _ = self.health_env()
+        owner, _ = self.owner(env, self.health("valid", einvoicing="on"))
+        owner._metanow_fiscal_refresh_health()
+        self.assertEqual(owner.metanow_fiscal_einvoice_platform, "on")
+        owner.metanow_fiscal_einvoice = True
+        self.assertIs(owner._metanow_fiscal_einvoice_on(), True)
+        self.assertIsNone(owner._metanow_fiscal_einvoice_notice())
+
+    def test_an_efis_that_does_not_say_is_read_as_before(self):
+        env, _ = self.health_env()
+        owner, _ = self.owner(env, self.health("valid"))
+        owner._metanow_fiscal_refresh_health()
+        self.assertIs(owner.metanow_fiscal_einvoice_platform, False)
+        owner.metanow_fiscal_einvoice = True
+        self.assertIs(owner._metanow_fiscal_einvoice_on(), True)
+        self.assertIsNone(owner._metanow_fiscal_einvoice_notice())
+
+    def test_the_notice_is_not_shown_to_a_company_that_wants_no_e_invoices(self):
+        env, _ = self.health_env()
+        owner, _ = self.owner(env, self.health("valid", einvoicing="off"))
+        owner._metanow_fiscal_refresh_health()
+        owner.metanow_fiscal_einvoice = False
+        self.assertIsNone(owner._metanow_fiscal_einvoice_notice())
+        self.assertIs(owner._metanow_fiscal_einvoice_on(), False)
 
     def test_the_health_read_names_the_tenant(self):
         env, _ = self.health_env()

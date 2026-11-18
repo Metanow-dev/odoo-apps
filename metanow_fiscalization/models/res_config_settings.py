@@ -28,6 +28,9 @@ class ResConfigSettings(models.TransientModel):
     metanow_fiscal_registry_notice = fields.Text(compute="_compute_metanow_fiscal_registry_notice")
     metanow_fiscal_vat_status = fields.Selection(related="company_id.metanow_fiscal_vat_status", readonly=False)
     metanow_fiscal_einvoice = fields.Boolean(related="company_id.metanow_fiscal_einvoice", readonly=False)
+    # DEV-2451: why an invoice to a business goes out as a plain fiscal invoice although the switch
+    # above is on -- e-invoices are off in the efis platform.
+    metanow_fiscal_einvoice_notice = fields.Text(compute="_compute_metanow_fiscal_einvoice_notice")
     metanow_fiscal_inbound_enabled = fields.Boolean(related="company_id.metanow_fiscal_inbound_enabled", readonly=False)
     metanow_fiscal_inbound_since = fields.Date(related="company_id.metanow_fiscal_inbound_since", readonly=False)
     # Typed here and exchanged when the settings are saved. It is single-use, so it is not kept.
@@ -39,6 +42,11 @@ class ResConfigSettings(models.TransientModel):
     # DEV-1704
     metanow_fiscal_webhook_status = fields.Text(related="company_id.metanow_fiscal_webhook_status")
     metanow_fiscal_certificate_notice = fields.Text(compute="_compute_metanow_fiscal_certificate_notice")
+
+    @api.depends("company_id", "metanow_fiscal_einvoice")
+    def _compute_metanow_fiscal_einvoice_notice(self):
+        for settings in self:
+            settings.metanow_fiscal_einvoice_notice = settings.company_id._metanow_fiscal_einvoice_notice() or False
 
     @api.depends("company_id")
     def _compute_metanow_fiscal_certificate_notice(self):

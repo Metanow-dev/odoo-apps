@@ -14,6 +14,7 @@ from ..efis import payload as efis_payload
 from ..efis import money
 from ..efis import qr
 from ..efis import receivables
+from ..efis import relink
 from ..efis import restore
 from ..efis.profile import PAYMENT_METHODS
 
@@ -68,6 +69,14 @@ RESTORED_NOTE = ("Rikthyer nga efis pas riinstalimit të modulit; asgjë nuk u d
 REGISTERED_NOTE = "Regjistruar nga efis. / Registered by efis."
 BACKFILLED_NOTE = ("Regjistruar nga efis më parë; të dhënat ruhen këtu që të lexohen edhe pa modulin. "
                    "/ Registered by efis earlier; the values are kept here so they can be read without the module.")
+
+# DEV-2462: the two notes that carry a received e-invoice's identity in the chatter, which stays
+# when the module is uninstalled. The first is what the re-link reads the EIC from later.
+INBOUND_NOTE = ("Kjo faturë blerje u krijua nga një e-faturë e marrë në efis. "
+                "/ This vendor bill was made from an e-invoice received in efis.")
+RELINKED_NOTE = ("Lidhur përsëri me e-faturën e marrë në efis pas riinstalimit të modulit; asgjë nuk u dërgua. "
+                 "/ Linked again to the received e-invoice in efis after the module was reinstalled; "
+                 "nothing was sent.")
 
 
 class AccountMove(models.Model):
@@ -682,6 +691,9 @@ class AccountMove(models.Model):
         for company in companies:
             try:
                 done = self.with_company(company).sudo()._metanow_fiscal_restore(company)
+                # DEV-2462: the same action links the received e-invoices' vendor bills again.
+                if company.metanow_fiscal_inbound_enabled:
+                    done = self.with_company(company).sudo()._metanow_fiscal_relink_inbound(company) and done
             except UserError as error:
                 _logger.info("efis restore for company %s did not run: %s", company.id, error)
                 company._metanow_fiscal_restore_finished(str(error))
@@ -1083,6 +1095,9 @@ class AccountMove(models.Model):
                 notes.append(f"Monedha {current['currency']} nuk gjendet në Odoo. / The currency {current['currency']} is not in Odoo.")
         values["metanow_fiscal_inbound_note"] = "\n".join(notes)
         bill = self.with_company(company).create(values)
+        # DEV-2462: the e-invoice's identity in the chatter, which an uninstall does not empty, so
+        # the bill can be linked to it again after a reinstall.
+        bill.message_post(body=plaintext2html(relink.note(INBOUND_NOTE, current)))
         bill._metanow_fiscal_inbound_attach_pdf(client)
         return bill
 
@@ -1168,3 +1183,126 @@ class AccountMove(models.Model):
                 bill.write({"metanow_fiscal_inbound_waiting": False,
                             "metanow_fiscal_inbound_decision": efis_inbound.decision_text(body)})
         return True
+
+    # ------------------------------------------------------------------ re-link received e-invoices (DEV-2462)
+
+    @api.model
+    def _metanow_fiscal_relink_candidates(self, company):
+        """The company's vendor bills that carry no received e-invoice: the ones an uninstall
+        emptied, and the ones a person typed by hand. A hand-typed bill is one of them on purpose
+        (decided 18 Nov 2026): where it matches an e-invoice exactly it is that same supplier
+        document, so linking it is what lets the business answer the authority from Odoo."""
+        return self.search([
+            ("company_id", "=", company.id), ("move_type", "=", "in_invoice"),
+            ("state", "in", ["draft", "posted"]), ("metanow_fiscal_inbound_id", "=", False),
+        ], order="id")
+
+    @api.model
+    def _metanow_fiscal_inbound_linked(self, inbound_ids):
+        """The efis e-invoice ids, among these, that a vendor bill already stores."""
+        if not inbound_ids:
+            return set()
+        bills = self.search([("metanow_fiscal_inbound_id", "in", sorted(inbound_ids))])
+        return {bill.metanow_fiscal_inbound_id for bill in bills}
+
+    @api.model
+    def _metanow_fiscal_inbound_chatter_eics(self, bills):
+        """The EIC each of these bills' chatter names, read in one search over the messages.
+
+        The module writes it there when it makes the bill (DEV-2433). An uninstall removes the
+        module's fields but not the chatter, so this is where a bill's e-invoice survives one.
+        """
+        if not bills:
+            return {}
+        messages = self.env["mail.message"].sudo().search(
+            [("model", "=", "account.move"), ("res_id", "in", [bill.id for bill in bills]),
+             ("body", "like", relink.EIC_MARK)], order="id")
+        found = {}
+        for message in messages:
+            eic = relink.eic_in(message.body or "")
+            if eic:
+                found.setdefault(message.res_id, eic)
+        return found
+
+    def _metanow_fiscal_relink_values(self, eic):
+        """The bill as plain values for relink.match, with the EIC its chatter names."""
+        self.ensure_one()
+        partner = self.commercial_partner_id
+        return {
+            "key": self.id,
+            "eic": eic,
+            "seller": partner.vat if partner else None,
+            "number": self.ref,
+            "amount_total": self.amount_total,
+            "has_lines": any(line.display_type == "product" for line in self.invoice_line_ids),
+            "currency": self.currency_id.name,
+        }
+
+    @api.model
+    def _metanow_fiscal_relink_inbound(self, company):
+        """One run of the re-link for a company: read every received e-invoice efis lists, link at
+        most RESTORE_BATCH bills, and note why each other one was left alone. Returns True when
+        nothing is left to link. Only reads from efis; it never accepts, refuses or sends."""
+        client = company._metanow_fiscal_client()
+        try:
+            response = client.list_inbound()
+        except efis_client.EfisUnavailable as error:
+            raise UserError(f"efis nuk u përgjigj. / efis did not answer. ({error})") from error
+        if response.status != 200 or not isinstance(response.body, dict):
+            raise UserError(
+                f"efis nuk dha listën e e-faturave të marra ({response.status}). "
+                f"/ efis did not return the list of received e-invoices ({response.status}).")
+        # An e-invoice whose bill a person deleted was told to be left alone; it stays left alone.
+        ignored = company._metanow_fiscal_inbound_ignored()
+        views = [view for view in (response.body.get("einvoices") or [])
+                 if view.get("id") and view["id"] not in ignored]
+        bills = {bill.id: bill for bill in self._metanow_fiscal_relink_candidates(company)}
+        if not bills or not views:
+            return True
+        linked = self._metanow_fiscal_inbound_linked({view["id"] for view in views})
+        eics = self._metanow_fiscal_inbound_chatter_eics(list(bills.values()))
+        matches, skipped = relink.match(
+            [bill._metanow_fiscal_relink_values(eics.get(bill.id)) for bill in bills.values()], views, linked)
+
+        for key, view in matches[:RESTORE_BATCH]:
+            bills[key]._metanow_fiscal_relink_one(efis_inbound.values(view))
+        for key, reason in skipped:
+            bill = bills[key]
+            text = relink.REASONS[reason]
+            if (bill.metanow_fiscal_restore_note or False) != text:
+                bill.write({"metanow_fiscal_restore_note": text})
+        return len(matches) <= RESTORE_BATCH
+
+    def _metanow_fiscal_relink_one(self, current):
+        """Link this bill to its received e-invoice in one write, and say so in the chatter.
+
+        The PDF is left to the import job: it attaches one only where the bill has none, and the
+        bill is one it knows from now on. Nothing is accepted or refused: the answer stays with
+        the person, who sees it waiting again on the bill.
+        """
+        self.ensure_one()
+        if self.metanow_fiscal_inbound_id:
+            return  # Linked since the list was read.
+        self.write({
+            "metanow_fiscal_inbound_id": current["id"],
+            "metanow_fiscal_inbound_eic": current["eic"],
+            "metanow_fiscal_inbound_seller": current["seller"],
+            "metanow_fiscal_inbound_amount": current["amount"],
+            "metanow_fiscal_inbound_status": current["status"],
+            "metanow_fiscal_inbound_answer_by": current["answer_by"],
+            "metanow_fiscal_inbound_waiting": current["waiting"],
+            "metanow_fiscal_inbound_decision": current["decision"],
+            "metanow_fiscal_inbound_fiscalised": current["fiscalised"],
+            "metanow_fiscal_inbound_pdf_pending": current["has_pdf"] and not self._metanow_fiscal_has_pdf(),
+            "metanow_fiscal_restored": True,
+            "metanow_fiscal_restore_note": False,
+        })
+        self.message_post(body=plaintext2html(relink.note(RELINKED_NOTE, current)))
+
+    def _metanow_fiscal_has_pdf(self):
+        """Whether a PDF is already attached to this bill: the authority's one stays through an
+        uninstall, and the import job must not attach it a second time."""
+        self.ensure_one()
+        return bool(self.env["ir.attachment"].sudo().search_count([
+            ("res_model", "=", "account.move"), ("res_id", "=", self.id),
+            ("mimetype", "=", "application/pdf")]))
