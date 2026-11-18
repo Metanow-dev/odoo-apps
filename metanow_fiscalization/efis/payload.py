@@ -328,7 +328,9 @@ def _electronic(config, method, cash, buyer):
     """Whether this invoice goes to the buyer as an e-invoice (SubmitDocumentRequest.electronic).
 
     Yes for a non-cash invoice to a buyer named by a tax number, while the company has e-invoices
-    on. A tax number here is the identifier efis reads by default, with no identifier type set on
+    on and the efis platform builds them (DEV-2451: `config["einvoice"]` is both, so where efis
+    has no e-invoice service the invoice goes out as a plain fiscal invoice instead of being
+    refused). A tax number here is the identifier efis reads by default, with no identifier type set on
     the partner: a domestic taxpayer number. A buyer with another identifier (a passport, a foreign
     VAT number) or none gets a plain fiscal invoice. efis refuses an e-invoice paid in cash, so a
     cash invoice is never one.

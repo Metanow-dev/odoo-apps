@@ -330,6 +330,29 @@ class EinvoiceSendTests(unittest.TestCase):
         record._metanow_fiscal_send()
         self.assertNotIn("einvoice", opener.requests[0]["body"])
 
+    # DEV-2451: efis refuses an invoice marked electronic where its platform builds no e-invoices,
+    # so the module sends a plain fiscal invoice there instead of having every invoice to a
+    # business refused. The person's setting is left as they set it.
+    def test_a_platform_without_e_invoices_sends_a_plain_fiscal_invoice(self):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        record = move(env, company(
+            env, opener=opener, metanow_fiscal_einvoice=True, metanow_fiscal_einvoice_platform="off"))
+        record._post()
+        record._metanow_fiscal_send()
+        self.assertNotIn("electronic", opener.requests[0]["body"])
+        self.assertNotIn("einvoice", opener.requests[0]["body"])
+        self.assertIs(record.metanow_fiscal_electronic, False)
+
+    def test_a_platform_with_e_invoices_still_sends_one(self):
+        env = environment()
+        opener = support.FakeOpener((202, support.document_response()))
+        record = move(env, company(
+            env, opener=opener, metanow_fiscal_einvoice=True, metanow_fiscal_einvoice_platform="on"))
+        record._post()
+        record._metanow_fiscal_send()
+        self.assertIs(opener.requests[0]["body"]["electronic"], True)
+
     def test_off_in_the_company_sends_a_plain_fiscal_invoice(self):
         env = environment()
         opener = support.FakeOpener((202, support.document_response()))
@@ -442,7 +465,9 @@ class PairingTests(unittest.TestCase):
         opener = support.FakeOpener(
             (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
             (200, support.PROFILE_DOCUMENT),
-            (200, support.REGISTRY_DOCUMENT))
+            (200, support.REGISTRY_DOCUMENT),
+            # DEV-2451: pairing also asks whether this platform builds e-invoices.
+            (200, {"tenantId": "shembull", "einvoicing": "off"}))
         record = company(env, opener=opener, metanow_fiscal_credential=False, metanow_fiscal_tenant=False,
                          metanow_fiscal_channel=False, metanow_fiscal_profile=False)
         record._metanow_fiscal_pair(" 123-456 ")
@@ -456,6 +481,8 @@ class PairingTests(unittest.TestCase):
         self.assertEqual(opener.requests[2]["url"], "https://efis.example.invalid/v1/registry")
         self.assertEqual(opener.requests[2]["headers"]["x-credential"], "c-9")
         self.assertEqual(record._metanow_fiscal_registry().codes, support.registry().codes)
+        self.assertTrue(opener.requests[3]["url"].endswith("/v1/tenants/shembull/health"))
+        self.assertEqual(record.metanow_fiscal_einvoice_platform, "off")
 
     def test_pairing_holds_when_the_codes_cannot_be_read(self):
         # The pairing code is single-use and already spent, so a failed read of the codes must
@@ -464,7 +491,8 @@ class PairingTests(unittest.TestCase):
         opener = support.FakeOpener(
             (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
             (200, support.PROFILE_DOCUMENT),
-            (503, None))
+            (503, None),
+            (200, {"tenantId": "shembull", "einvoicing": "on"}))
         record = company(env, opener=opener, metanow_fiscal_credential=False, metanow_fiscal_tenant=False)
         self.assertTrue(record._metanow_fiscal_pair("123-456"))
         self.assertEqual(record.metanow_fiscal_credential, "c-9")
@@ -485,7 +513,8 @@ class PairingTests(unittest.TestCase):
         opener = support.FakeOpener(
             (200, {"credential": "c-9", "tenantId": "shembull", "channel": "odoo"}),
             (200, support.PROFILE_DOCUMENT),
-            (200, support.REGISTRY_DOCUMENT))
+            (200, support.REGISTRY_DOCUMENT),
+            (200, {"tenantId": "shembull", "einvoicing": "on"}))
         record = company(env, opener=opener, metanow_fiscal_credential=False)
         settings = ResConfigSettings(env, company_id=record, metanow_fiscal_pairing_code=" 123-456 ")
         settings.set_values()

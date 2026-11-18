@@ -15,6 +15,14 @@
                     <setting string="Fatura elektronike / E-invoices"
                              help="Një faturë pa para në dorë për një blerës me numër tatimor dërgohet si faturë elektronike. / A non-cash invoice to a buyer with a tax number is sent as an e-invoice.">
                         <field name="metanow_fiscal_einvoice"/>
+                        <!-- DEV-2451: efis builds no e-invoice where its platform has no e-invoice
+                             service, and refuses an invoice marked electronic. Said here, because the
+                             setting above is on and nothing it promises would happen. -->
+                        <div class="content-group" invisible="not metanow_fiscal_einvoice_notice">
+                            <div class="alert alert-warning mt8" role="alert">
+                                <field name="metanow_fiscal_einvoice_notice"/>
+                            </div>
+                        </div>
                     </setting>
                     <!-- DEV-2433 -->
                     <setting string="E-faturat e marra / Received e-invoices"

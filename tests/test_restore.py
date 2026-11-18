@@ -311,7 +311,8 @@ class RestoreRequestTests(unittest.TestCase):
         env = restore_env()
         opener = support.FakeOpener(
             (200, {"credential": "c-2", "tenantId": "shembull", "channel": "odoo"}),
-            (200, support.PROFILE_DOCUMENT), (200, support.REGISTRY_DOCUMENT))
+            (200, support.PROFILE_DOCUMENT), (200, support.REGISTRY_DOCUMENT),
+            (200, {"tenantId": "shembull", "einvoicing": "on"}))
         owner = company(env, opener=opener)
         owner._metanow_fiscal_pair("ABC-123")
         self.assertTrue(owner.metanow_fiscal_restore_pending)

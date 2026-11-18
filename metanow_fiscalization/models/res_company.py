@@ -85,6 +85,12 @@ class ResCompany(models.Model):
         help="Një faturë pa para në dorë për një blerës me numër tatimor dërgohet si faturë elektronike. "
              "/ A non-cash invoice to a buyer with a tax number is sent as an e-invoice.",
     )
+    # DEV-2451: "on" or "off", as efis's health read says it. efis builds an e-invoice only where
+    # its platform has the e-invoice service, and refuses an invoice marked electronic where it
+    # does not. The setting above stays the person's own: while this says "off" the module sends
+    # plain fiscal invoices and Settings says why. Empty means an efis that does not say, which
+    # is read as on, as before this field existed.
+    metanow_fiscal_einvoice_platform = fields.Char(copy=False, readonly=True)
     metanow_fiscal_profile = fields.Text(
         string="Profili i vendit nga efis / efis country profile",
         copy=False,
@@ -181,6 +187,9 @@ class ResCompany(models.Model):
             self._metanow_fiscal_refresh_registry()
         except UserError as error:
             _logger.warning("efis registry not read after pairing company %s: %s", self.id, error)
+        # DEV-2451: whether this platform builds e-invoices, before the first invoice is sent. A
+        # failed read leaves the field empty, which is read as on, and the health job reads it again.
+        self._metanow_fiscal_refresh_einvoice_platform()
         # DEV-2443: invoices that lost their fiscal values in an uninstall get them back from efis.
         # On a company with none, the run finds nothing and only says so.
         self._metanow_fiscal_restore_request()
@@ -307,6 +316,7 @@ class ResCompany(models.Model):
             return
         if response.status != 200 or not isinstance(response.body, dict):
             return
+        self._metanow_fiscal_einvoice_platform_read(response.body)
         certificate = response.body.get("certificate") or {}
         status = str(certificate.get("status") or "") or False
         until = str(certificate.get("notAfter") or "")[:10] or False
@@ -314,6 +324,42 @@ class ResCompany(models.Model):
                                str(self.metanow_fiscal_certificate_until or "") or False):
             self.sudo().write({"metanow_fiscal_certificate_status": status, "metanow_fiscal_certificate_until": until})
         self._metanow_fiscal_certificate_activities(status in CERTIFICATE_ATTENTION)
+
+    def _metanow_fiscal_refresh_einvoice_platform(self):
+        """Read whether efis builds e-invoices, from the same health read, without touching the
+        certificate's To-Dos (DEV-2451). Called at pairing, so the first invoice already knows."""
+        self.ensure_one()
+        try:
+            response = self._metanow_fiscal_client().get_health()
+        except (efis_client.EfisUnavailable, UserError) as error:
+            _logger.info("efis health not read for company %s: %s", self.id, error)
+            return
+        if response.status == 200 and isinstance(response.body, dict):
+            self._metanow_fiscal_einvoice_platform_read(response.body)
+
+    def _metanow_fiscal_einvoice_platform_read(self, body):
+        """Keep what efis's health said about e-invoices. A word efis does not send leaves the
+        field as it is, so an efis that does not say is read as before this field existed: on."""
+        self.ensure_one()
+        said = str(body.get("einvoicing") or "")
+        if said in ("on", "off") and said != (self.metanow_fiscal_einvoice_platform or ""):
+            self.sudo().write({"metanow_fiscal_einvoice_platform": said})
+
+    def _metanow_fiscal_einvoice_on(self):
+        """Whether an invoice to a business goes out as an e-invoice: the person's setting, and
+        efis's platform able to build one (DEV-2451)."""
+        self.ensure_one()
+        return bool(self.metanow_fiscal_einvoice) and self.metanow_fiscal_einvoice_platform != "off"
+
+    def _metanow_fiscal_einvoice_notice(self):
+        """The Settings line while e-invoices are wanted and efis cannot build them, or None."""
+        self.ensure_one()
+        if not self.metanow_fiscal_einvoice or self.metanow_fiscal_einvoice_platform != "off":
+            return None
+        return ("Faturat elektronike nuk janë aktive në platformën efis, kështu që faturat dërgohen si fatura "
+                "fiskale të thjeshta. Zgjedhja juaj mbetet e ruajtur. "
+                "/ E-invoices are not switched on in the efis platform, so invoices are sent as plain fiscal "
+                "invoices. Your choice here is kept.")
 
     def _metanow_fiscal_certificate_notice(self):
         """The Settings warning for the certificate, or None while it is valid."""
@@ -429,7 +475,7 @@ class ResCompany(models.Model):
             "operator_code": company.metanow_fiscal_operator_code,
             "software_code": company.metanow_fiscal_software_code,
             "device_code": company.metanow_fiscal_device_code,
-            "einvoice": bool(company.metanow_fiscal_einvoice),
+            "einvoice": company._metanow_fiscal_einvoice_on(),
         }
 
     def write(self, vals):
