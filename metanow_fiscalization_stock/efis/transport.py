@@ -43,6 +43,10 @@ RULES = {
 
 # CLAUDE.md: an explicit numeric offset and whole seconds, never milliseconds.
 _TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$")
+# DEV-2640: the authority's own VehPlatesSType, which efis checks before it numbers anything.
+# "AA 123 BB", the way plates are written here, is not it, and a note carrying one can never be
+# accepted -- so it is refused here, where the person can still correct it, and never rewritten.
+_PLATES = re.compile(r"^[A-Za-z0-9-]+$")
 
 
 class TransportInvalid(ValueError):
@@ -92,6 +96,10 @@ def build(note, config, kind=TRANSFER_NOTE, profile=None):
     plates = _text(note.get("vehicle_plates"))
     if not plates:
         problems.append("Mungojnë targat e mjetit. / The vehicle plates are missing.")
+    elif not _PLATES.match(plates):
+        problems.append(
+            "Targat e mjetit shkruhen vetëm me shkronja, numra dhe vija, pa hapësira: AA123BB. "
+            "/ The vehicle plates are letters, digits and hyphens only, with no spaces: AA123BB.")
     ownership = _text(note.get("vehicle_ownership"))
     if ownership not in VEHICLE_OWNERSHIPS:
         problems.append("Zgjidhni kujt i përket mjeti. / Choose whom the vehicle belongs to.")
