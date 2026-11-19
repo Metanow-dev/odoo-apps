@@ -12,7 +12,9 @@ MOCK_ENDPOINT="http://mock-cis:8080/FiscalizationService-v3"
 export EFIS_GATEWAY_ENDPOINT="$MOCK_ENDPOINT"
 export EFIS_GATEWAY_SIGNER=mock
 export EFIS_AUTHORITY_ENVIRONMENT=Test
-export EFIS_PULL_POLICY=always
+# always in CI, where the image comes from the registry; a local run (DEV-2348) against a
+# locally built efis:local sets this to missing.
+export EFIS_PULL_POLICY="${EFIS_PULL_POLICY:-always}"
 export ASPNETCORE_ENVIRONMENT=Production
 
 # Never anywhere but the mock: this job has no business reaching the authority, test or production.
@@ -79,6 +81,14 @@ grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not f
 # DEV-1704: registering for efis's events, and the certificate's state, against the real efis.
 compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/webhook_check.py | tee -a odoo-install.log
 grep -q '^ODOO-WEBHOOK-PASSED' odoo-install.log || { echo "The module did not register for efis's events." >&2; exit 1; }
+
+# DEV-2348: a stock transfer through efis as a customer would do it: a transfer note issued,
+# numbered, registered and printed, then the same transfer as a transport invoice, which this
+# deployment does not issue. It runs before the uninstall below, which takes the add-ons with it.
+compose --profile odoo run --rm -T \
+  -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)" \
+  odoo odoo shell -d ci < ci/transport_check.py | tee -a odoo-install.log
+grep -q '^ODOO-TRANSPORT-PASSED' odoo-install.log || { echo "The transfer note did not go through efis." >&2; exit 1; }
 
 # DEV-2443: uninstall through Odoo's dialog, install again, pair again, and restore from efis.
 FISCALISED="$(sed -n 's/^ODOO-INSTALL-PASSED //p' odoo-install.log | tail -n 1)"
