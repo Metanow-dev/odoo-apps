@@ -99,6 +99,8 @@ def main():
         "businessUnitCode": CODES["business-unit"],
         "operatorCode": CODES["operator"],
         "softwareCode": CODES["software"],
+        # DEV-2348: a cash invoice is issued on a device, so the check needs its code too.
+        "deviceCode": CODES["device"],
     }))
 
 

@@ -6,6 +6,7 @@ exercised by the odoo-install CI job (DEV-1731), not here.
 """
 
 import contextlib
+import datetime
 import sys
 import types
 
@@ -219,6 +220,51 @@ def _identity_decorator(*args, **kwargs):
     return wrap
 
 
+class _Zone(datetime.tzinfo):
+    """One of pytz's timezones, as the modules use one: a stamp with an explicit offset.
+
+    The real zone is used where the interpreter has the zone database (zoneinfo), so a stamp
+    carries Albania's offset of the day, summer time included. Where it does not -- the test
+    image is python:3.13-alpine, which ships no tzdata -- the offset is CET, which is what
+    Albania is on outside summer. A test must therefore read the offset from the stamp it is
+    checking rather than expect one, and no test here depends on the hour.
+    """
+
+    def __init__(self, name, fallback=datetime.timedelta(hours=1)):
+        self._name = name
+        self._fallback = fallback
+        try:
+            import zoneinfo
+            self._zone = zoneinfo.ZoneInfo(name)
+        except Exception:  # no zone database: the fixed offset below
+            self._zone = None
+
+    def utcoffset(self, dt):
+        return self._zone.utcoffset(dt) if self._zone else self._fallback
+
+    def dst(self, dt):
+        return self._zone.dst(dt) if self._zone else datetime.timedelta(0)
+
+    def tzname(self, dt):
+        return self._zone.tzname(dt) if self._zone else self._name
+
+    def localize(self, moment):
+        """pytz's own way of giving a naive moment a zone."""
+        return moment.replace(tzinfo=self)
+
+
+def _install_pytz():
+    """pytz comes with Odoo, so the stand-in provides it too (DEV-2641)."""
+    if "pytz" in sys.modules and not getattr(sys.modules["pytz"], "__fake__", False):
+        return sys.modules["pytz"]
+    pytz = types.ModuleType("pytz")
+    pytz.__fake__ = True
+    pytz.utc = _Zone("UTC", datetime.timedelta(0))
+    pytz.timezone = lambda name: _Zone(name)
+    sys.modules["pytz"] = pytz
+    return pytz
+
+
 def install():
     """Register the stand-in as 'odoo' unless it is already there."""
     if "odoo" in sys.modules and getattr(sys.modules["odoo"], "__fake__", False):
@@ -264,4 +310,5 @@ def install():
         "odoo.tools": tools,
         "odoo.http": http,
     })
+    _install_pytz()
     return odoo

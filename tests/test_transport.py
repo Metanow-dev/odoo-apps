@@ -29,7 +29,7 @@ def note(**overrides):
         "transaction": "TRANSFER",
         "issued_at": "2026-11-11T15:01:50+01:00",
         "value_of_goods": 142.0,
-        "vehicle_plates": "AA 123 BB",
+        "vehicle_plates": "AA123BB",
         "vehicle_ownership": "OWNER",
         "flammable": False,
         "escort": False,
@@ -103,6 +103,18 @@ class BuildTests(unittest.TestCase):
         with self.assertRaises(transport.TransportInvalid) as raised:
             build(vehicle_plates=" ", vehicle_ownership=None)
         self.assertEqual(len(raised.exception.problems), 2)
+
+    def test_the_plates_are_the_ones_the_authority_schema_accepts(self):
+        # DEV-2640: the authority's VehPlatesSType is [a-zA-Z0-9-]+, so "AA 123 BB" -- the way
+        # plates are written here -- can never be accepted. It is refused before anything is
+        # sent, and never rewritten into something the person did not type.
+        self.assertEqual(build(vehicle_plates="AA-123-BB")["vehiclePlates"], "AA-123-BB")
+        self.assertEqual(build(vehicle_plates=" AA123BB ")["vehiclePlates"], "AA123BB")
+        for plates in ("AA 123 BB", "AA.123.BB", "AA/123"):
+            with self.assertRaises(transport.TransportInvalid, msg=plates) as raised:
+                build(vehicle_plates=plates)
+            self.assertEqual(len(raised.exception.problems), 1)
+            self.assertIn("no spaces", str(raised.exception))
 
     def test_places_take_only_the_kinds_efis_publishes(self):
         body = build(**{"from": {"address": "Dogana", "city": "Durrës", "kind": "CUSTOMS"}})

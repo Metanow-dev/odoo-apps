@@ -9,6 +9,7 @@ from odoo.exceptions import UserError
 
 from odoo.addons.metanow_fiscalization.efis import client as efis_client
 from odoo.addons.metanow_fiscalization.efis import inbound as efis_inbound
+from odoo.addons.metanow_fiscalization.efis import outcome as efis_outcome
 
 from ..efis import transport
 from .stock_warehouse import PLACE_KINDS
@@ -323,19 +324,23 @@ class StockPicking(models.Model):
                 self._metanow_fiscal_trigger("metanow_fiscalization_stock.ir_cron_metanow_fiscal_wtn_poll")
             return
         code = body.get("code") or str(answer.status)
+        # DEV-2641: efis's own sentence, then its code and correlation id, as a refused invoice
+        # shows them (DEV-2223). The person has to know which field to correct before issuing again.
+        said = efis_outcome.error_text(answer)
         if code == "transport_invoices_disabled":
-            # The deployment has them switched off: no number was spent, and resending changes nothing.
+            # The deployment has them switched off: no number was spent, and resending changes
+            # nothing. Nothing about the document is wrong, so it is said in our own words.
             self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error":
                         "efis nuk lëshon ende fatura transporti. / efis does not issue transport invoices yet."})
         elif answer.status >= 500 or answer.status == 429:
-            self.write({"metanow_fiscal_wtn_error": f"efis: {code}"})  # efis's trouble: sent again
+            self.write({"metanow_fiscal_wtn_error": said})  # efis's trouble: sent again
         elif code in ("issued_at_not_today", "idempotency_key_reused"):
             # Not issued today, or the key names another note: a person issues it again, and the
             # check before that finds a note efis did number.
-            self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error": f"efis: {code}"})
+            self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error": said})
         else:
             # efis refused before numbering: no number was spent. Corrected and issued again.
-            self.write({"metanow_fiscal_wtn_state": "refused", "metanow_fiscal_wtn_error": f"efis: {code}"})
+            self.write({"metanow_fiscal_wtn_state": "refused", "metanow_fiscal_wtn_error": said})
 
     @api.model
     def _cron_metanow_fiscal_wtn_send(self):
