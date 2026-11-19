@@ -90,6 +90,14 @@ compose --profile odoo run --rm -T \
   odoo odoo shell -d ci < ci/transport_check.py | tee -a odoo-install.log
 grep -q '^ODOO-TRANSPORT-PASSED' odoo-install.log || { echo "The transfer note did not go through efis." >&2; exit 1; }
 
+# DEV-2348: a till's cash through efis -- the day's opening float, cash in and out, one float a
+# day per device, and a declared movement that is never deleted. Before the uninstall too, which
+# takes the Point of Sale add-on with it.
+compose --profile odoo run --rm -T \
+  -e EFIS_DEVICE_CODE="$(field deviceCode)" \
+  odoo odoo shell -d ci < ci/pos_check.py | tee -a odoo-install.log
+grep -q '^ODOO-POS-PASSED' odoo-install.log || { echo "The till's cash did not go through efis." >&2; exit 1; }
+
 # DEV-2443: uninstall through Odoo's dialog, install again, pair again, and restore from efis.
 FISCALISED="$(sed -n 's/^ODOO-INSTALL-PASSED //p' odoo-install.log | tail -n 1)"
 compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/uninstall.py | tee -a odoo-install.log
