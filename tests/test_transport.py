@@ -71,7 +71,10 @@ class BuildTests(unittest.TestCase):
     def test_every_key_is_one_efis_publishes(self):
         schemas = support.openapi()["components"]["schemas"]
         body = build()
-        self.assertEqual(set(body), set(schemas["TransportDocumentRequest"]["properties"]))
+        # A subset, as the nested objects are checked: the module never sends a field efis does
+        # not publish, and efis may publish one the module has nothing to put in. The packaging
+        # fields it added in DEV-2508 are optional for the authority too (DEV-2645).
+        self.assertLessEqual(set(body), set(schemas["TransportDocumentRequest"]["properties"]))
         self.assertLessEqual(set(body["from"]), set(schemas["TransportPlaceInput"]["properties"]))
         self.assertLessEqual(set(body["issuer"]), set(schemas["TransportPartyInput"]["properties"]))
         self.assertLessEqual(set(body["goods"][0]), set(schemas["TransportGoodsInput"]["properties"]))
@@ -217,7 +220,7 @@ class TransportInvoiceTests(unittest.TestCase):
     def test_every_key_is_one_efis_publishes(self):
         schemas = support.openapi()["components"]["schemas"]
         body = build_ti()
-        self.assertEqual(set(body), set(schemas["TransportInvoiceRequest"]["properties"]))
+        self.assertLessEqual(set(body), set(schemas["TransportInvoiceRequest"]["properties"]))
         self.assertEqual(set(body["receiver"]), set(schemas["TransportReceiverInput"]["properties"]))
         self.assertLessEqual(
             set(build_ti(carrier=CARRIER)["carrier"]), set(schemas["TransportCarrierInput"]["properties"]))

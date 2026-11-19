@@ -9,8 +9,18 @@
 set -eu
 
 MOCK_ENDPOINT="http://mock-cis:8080/FiscalizationService-v3"
+MOCK_EINVOICE_ENDPOINT="http://mock-cis:8080/EinvoiceService-v1"
 export EFIS_GATEWAY_ENDPOINT="$MOCK_ENDPOINT"
 export EFIS_GATEWAY_SIGNER=mock
+# DEV-2348: the e-invoice service is a different service of the authority, and without its
+# address efis builds no e-invoice at all, so the module's e-invoice path could not be checked.
+# The mock's, and sending switched on, so the authority's EIC comes back the way a customer's
+# does. Both are the mock and nothing else: the case below refuses any other address.
+export EFIS_EINVOICE_ENDPOINT="$MOCK_EINVOICE_ENDPOINT"
+export EFIS_EINVOICE_SEND=true
+# efis asks the authority for a business's purchase e-invoices every 15 minutes by default, which
+# no job waits for: every minute here, so one arrives while the check is still running.
+export EFIS_EINVOICE_SYNC_MINUTES=1
 export EFIS_AUTHORITY_ENVIRONMENT=Test
 # always in CI, where the image comes from the registry; a local run (DEV-2348) against a
 # locally built efis:local sets this to missing.
@@ -21,6 +31,10 @@ export ASPNETCORE_ENVIRONMENT=Production
 case "$EFIS_GATEWAY_ENDPOINT" in
   "$MOCK_ENDPOINT") ;;
   *) echo "odoo-install sends to the mock authority only." >&2; exit 1 ;;
+esac
+case "$EFIS_EINVOICE_ENDPOINT" in
+  "$MOCK_EINVOICE_ENDPOINT") ;;
+  *) echo "odoo-install sends e-invoices to the mock authority only." >&2; exit 1 ;;
 esac
 
 test -n "${EFIS_IMAGE:-}" || { echo "EFIS_IMAGE is required." >&2; exit 1; }
@@ -120,3 +134,10 @@ grep -q '^ODOO-RESTORE-PASSED' odoo-install.log || { echo "The fiscal data did n
 # correction supersedes the invoice it corrects.
 compose --profile odoo run --rm -T   -e EFIS_DEVICE_CODE="$(field deviceCode)"   odoo odoo shell -d ci < ci/invoice_check.py | tee -a odoo-install.log
 grep -q '^ODOO-INVOICE-PASSED' odoo-install.log || { echo "An invoice's corrections or payments did not go through efis." >&2; exit 1; }
+
+# DEV-2348: a purchase e-invoice arriving as a draft vendor bill the business answers (DEV-2433).
+# A second Odoo company, paired to the second business the driver provisioned, issues it, so the
+# e-invoice reaches the buyer the way a real one does. It runs after the stage above, which left
+# the buying company sending e-invoices.
+compose --profile odoo run --rm -T   -e EFIS_BASE_URL=http://api:8080   -e EFIS_SUPPLIER_PAIRING_CODE="$(field supplierCode)"   -e EFIS_SUPPLIER_TAX_ID="$(field supplierTaxId)"   -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)"   -e EFIS_OPERATOR_CODE="$(field operatorCode)"   -e EFIS_SOFTWARE_CODE="$(field softwareCode)"   odoo odoo shell -d ci < ci/inbound_check.py | tee -a odoo-install.log
+grep -q '^ODOO-INBOUND-PASSED' odoo-install.log || { echo "A purchase e-invoice did not arrive as a vendor bill." >&2; exit 1; }

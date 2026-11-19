@@ -16,6 +16,10 @@
           "twoFactorRecommended": {
             "default": false,
             "type": "boolean"
+          },
+          "twoFactorRequired": {
+            "default": false,
+            "type": "boolean"
           }
         },
         "required": [
@@ -2168,6 +2172,149 @@
         },
         "type": "object"
       },
+      "ConsoleSearchBuyer": {
+        "properties": {
+          "documentCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "taxId",
+          "name",
+          "documentCount"
+        ],
+        "type": "object"
+      },
+      "ConsoleSearchDocument": {
+        "properties": {
+          "buyer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "date": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "number": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "date",
+          "buyer",
+          "total",
+          "currency",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ConsoleSearchItem": {
+        "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "price",
+          "unit"
+        ],
+        "type": "object"
+      },
+      "ConsoleSearchResponse": {
+        "properties": {
+          "buyers": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleSearchBuyer"
+            },
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleSearchDocument"
+            },
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleSearchItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "documents",
+          "buyers",
+          "items"
+        ],
+        "type": "object"
+      },
       "ConsoleTcrListResponse": {
         "properties": {
           "registerReadAt": {
@@ -3358,6 +3505,10 @@
               "array"
             ]
           },
+          "awaitingReconciliation": {
+            "default": false,
+            "type": "boolean"
+          },
           "businessUnitCode": {
             "type": [
               "null",
@@ -3383,7 +3534,33 @@
               "string"
             ]
           },
+          "electronic": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "fiscalNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "heldReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "heldSince": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "heldUntil": {
+            "format": "date-time",
             "type": [
               "null",
               "string"
@@ -3543,12 +3720,38 @@
               "string"
             ]
           },
+          "heldReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "heldSince": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "heldUntil": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "id": {
             "format": "uuid",
             "type": "string"
           },
           "issuedAt": {
             "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentClass": {
             "type": [
               "null",
               "string"
@@ -3591,6 +3794,12 @@
               "string"
             ]
           },
+          "vat": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "verificationUrl": {
             "type": [
               "null",
@@ -3617,10 +3826,47 @@
               "$ref": "#/components/schemas/DocumentListItem"
             },
             "type": "array"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentListTotal"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
           }
         },
         "required": [
           "documents"
+        ],
+        "type": "object"
+      },
+      "DocumentListTotal": {
+        "properties": {
+          "count": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "vat": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "total",
+          "vat",
+          "count"
         ],
         "type": "object"
       },
@@ -6665,6 +6911,47 @@
         ],
         "type": "object"
       },
+      "PaymentFilingHealth": {
+        "properties": {
+          "dueSoon": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "nextDueBy": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "oldestOverdueDueBy": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "overdue": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "dueSoon",
+          "overdue",
+          "nextDueBy",
+          "oldestOverdueDueBy"
+        ],
+        "type": "object"
+      },
       "PaymentInput": {
         "properties": {
           "amount": {
@@ -8335,6 +8622,72 @@
         ],
         "type": "object"
       },
+      "ReconcileRequest": {
+        "properties": {
+          "method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "method",
+          "outcome",
+          "registrationCode",
+          "note"
+        ],
+        "type": "object"
+      },
+      "ReconcileResponse": {
+        "properties": {
+          "finding": {
+            "$ref": "#/components/schemas/UnverifiedFindingResponse"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "recordId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "registrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "recordId",
+          "state",
+          "registrationCode",
+          "finding"
+        ],
+        "type": "object"
+      },
       "ReconnectionRequest": {
         "properties": {
           "reconnectedAt": {
@@ -9499,6 +9852,9 @@
           "database": {
             "type": "string"
           },
+          "einvoicing": {
+            "type": "string"
+          },
           "schemaCurrent": {
             "type": "boolean"
           },
@@ -9522,7 +9878,8 @@
           "schemaCurrent",
           "signer",
           "certificate",
-          "authorityEnvironment"
+          "authorityEnvironment",
+          "einvoicing"
         ],
         "type": "object"
       },
@@ -9735,11 +10092,27 @@
             },
             "type": "object"
           },
+          "einvoicing": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "lastRegisteredAt": {
             "format": "date-time",
             "type": [
               "null",
               "string"
+            ]
+          },
+          "paymentFiling": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PaymentFilingHealth"
+              }
             ]
           },
           "printing": {
@@ -9854,8 +10227,109 @@
         ],
         "type": "object"
       },
+      "TransportCarrierView": {
+        "properties": {
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "town": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "idType",
+          "idNumber",
+          "name",
+          "address",
+          "town"
+        ],
+        "type": "object"
+      },
+      "TransportDocumentCheckProblem": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "index": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "path",
+          "index",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "TransportDocumentCheckResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/TransportDocumentCheckProblem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "problems"
+        ],
+        "type": "object"
+      },
       "TransportDocumentListResponse": {
         "properties": {
+          "next": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "transportDocuments": {
             "items": {
               "$ref": "#/components/schemas/TransportDocumentResponse"
@@ -9934,7 +10408,31 @@
               }
             ]
           },
+          "itemsCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
           "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "packCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "packType": {
             "type": [
               "null",
               "string"
@@ -10008,14 +10506,62 @@
           "businessUnitCode": {
             "type": "string"
           },
+          "carrier": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransportCarrierView"
+              }
+            ]
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "escortRequired": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           },
           "faultCode": {
             "type": [
               "null",
               "string"
+            ]
+          },
+          "fiscalisedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "from": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransportPlaceView"
+              }
+            ]
+          },
+          "goods": {
+            "items": {
+              "$ref": "#/components/schemas/TransportGoodsView"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "goodsFlammable": {
+            "type": [
+              "null",
+              "boolean"
             ]
           },
           "id": {
@@ -10026,8 +10572,48 @@
             "format": "date-time",
             "type": "string"
           },
+          "issuer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransportPartyView"
+              }
+            ]
+          },
+          "itemsCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
           "number": {
             "type": "string"
+          },
+          "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "packCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "packType": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "reasonCode": {
             "type": [
@@ -10044,8 +10630,78 @@
           "securityCode": {
             "type": "string"
           },
+          "sends": {
+            "items": {
+              "$ref": "#/components/schemas/TransportDocumentSendView"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "softwareCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "state": {
             "type": "string"
+          },
+          "to": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransportPlaceView"
+              }
+            ]
+          },
+          "transaction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unverifiedRegistrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "valueOfGoods": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "vehicleOwnership": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vehiclePlates": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationQrSvg": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "required": [
@@ -10059,6 +10715,35 @@
           "reasonCode",
           "faultCode",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "TransportDocumentSendView": {
+        "properties": {
+          "answered": {
+            "type": "boolean"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "repeated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "at",
+          "repeated",
+          "answered"
         ],
         "type": "object"
       },
@@ -10097,6 +10782,209 @@
           "code",
           "unit",
           "quantity"
+        ],
+        "type": "object"
+      },
+      "TransportGoodsView": {
+        "properties": {
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "unit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "code",
+          "unit",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceCheckProblem": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "index": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "path",
+          "index",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceCheckResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/TransportInvoiceCheckProblem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "problems"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceDefaultsPlace": {
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "city",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceDefaultsResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "issuer": {
+            "$ref": "#/components/schemas/InvoiceDefaultsSeller"
+          },
+          "recentPlates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "recentRoutes": {
+            "items": {
+              "$ref": "#/components/schemas/TransportInvoiceDefaultsRoute"
+            },
+            "type": "array"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/TransportInvoiceDefaultsUnit"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "issuer",
+          "units",
+          "recentPlates",
+          "recentRoutes"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceDefaultsRoute": {
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/TransportInvoiceDefaultsPlace"
+          },
+          "receiverTaxId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "$ref": "#/components/schemas/TransportInvoiceDefaultsPlace"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "receiverTaxId"
+        ],
+        "type": "object"
+      },
+      "TransportInvoiceDefaultsUnit": {
+        "properties": {
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "town": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "address",
+          "town",
+          "valid"
         ],
         "type": "object"
       },
@@ -10180,7 +11068,31 @@
               }
             ]
           },
+          "itemsCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
           "operatorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "packCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "packType": {
             "type": [
               "null",
               "string"
@@ -10347,7 +11259,78 @@
         ],
         "type": "object"
       },
+      "TransportPartyView": {
+        "properties": {
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "taxId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "town": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "taxId",
+          "name",
+          "address",
+          "town"
+        ],
+        "type": "object"
+      },
       "TransportPlaceInput": {
+        "properties": {
+          "address": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "city": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "city",
+          "at",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "TransportPlaceView": {
         "properties": {
           "address": {
             "type": [
@@ -10520,6 +11503,165 @@
         },
         "required": [
           "currentPassword"
+        ],
+        "type": "object"
+      },
+      "UnverifiedAnswerResponse": {
+        "properties": {
+          "answeredAt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "signerIssuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "signerSubject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "signerThumbprint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "signerSubject",
+          "signerIssuer",
+          "signerThumbprint",
+          "answeredAt"
+        ],
+        "type": "object"
+      },
+      "UnverifiedFindingResponse": {
+        "properties": {
+          "decidedAt": {
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "registrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "decidedAt",
+          "decidedBy",
+          "method",
+          "outcome",
+          "registrationCode",
+          "note"
+        ],
+        "type": "object"
+      },
+      "UnverifiedResponse": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/UnverifiedRowResponse"
+            },
+            "type": "array"
+          },
+          "signer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "records",
+          "truncated",
+          "signer"
+        ],
+        "type": "object"
+      },
+      "UnverifiedRowResponse": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/UnverifiedAnswerResponse"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/UnverifiedFindingResponse"
+            },
+            "type": "array"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "recordId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reverifies": {
+            "type": "boolean"
+          },
+          "taxId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "unverifiedRegistrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verifiedRegistrationCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "environment",
+          "tenantId",
+          "taxId",
+          "recordId",
+          "number",
+          "issuedAt",
+          "unverifiedRegistrationCode",
+          "answer",
+          "reverifies",
+          "verifiedRegistrationCode",
+          "findings"
         ],
         "type": "object"
       },
@@ -12194,6 +13336,127 @@
               }
             },
             "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/businesses/{tenantId}/unverified/{kind}/{id}/reconcile": {
+      "post": {
+        "description": "Records what a person established with the authority about one record parked as unverified, and accepts it with the code the authority holds. With method answer_reverified, efis reads the answer it already holds again under the configured signer and accepts the record with the code that verified answer carries -- never a code the request supplies; it refuses (409) when the answer still does not verify, or when it now carries a different code than the park recorded. With method portal, the person states the outcome, the code where the authority holds it, and what they saw. A finding of not_registered changes no state: the record stays parked and is never sent again. Every finding is a line in the platform audit log.",
+        "operationId": "AdminReconcileUnverified",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReconcileRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -14009,6 +15272,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MissingReasonResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/queue/unverified": {
+      "get": {
+        "description": "Records parked because the authority's answer carried a registration code but did not verify (DEV-2447): invoices whose step 40 parked, and transport notes, transport invoices and cash deposits reading unverified. Nothing sends them. Each row gives the code the answer carried, who really signed that answer, whether an answer efis already holds verifies under the signer configured now, and what has been established about the record so far. Oldest first.",
+        "operationId": "AdminQueueUnverified",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnverifiedResponse"
                 }
               }
             },
@@ -19116,6 +20429,92 @@
         ]
       }
     },
+    "/v1/console/search": {
+      "get": {
+        "description": "DEV-2503: the console's search box, for the business named by X-Tenant-Id only: documents, buyers and items, at most `limit` (1-20, default 5) of each. Read only; nothing typed is stored. Ten a second per person.",
+        "operationId": "SearchConsole",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSearchResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
     "/v1/console/transport-documents": {
       "post": {
         "description": "Issues a warehouse transfer note from the console form. Signed in (X-Session) as the business's own Owner or Accountant, with the password typed again (and a current code when two-factor is on). The console channel submits the note through the same handler as POST /v1/transport-documents, and its answer is returned unchanged. The note carries efis's own recorded software code. Idempotency-Key is passed through. 503 console_form_unavailable when the deployment has not set the channel's key.",
@@ -19246,6 +20645,163 @@
         ]
       }
     },
+    "/v1/console/transport-documents/check": {
+      "post": {
+        "description": "The console form's warehouse transfer note, checked as it is typed. Runs every check POST /v1/console/transport-documents runs before a number is used, in the same order, with efis's own software code, and answers with every problem found, each with the form field it belongs to (path) or null. No password and no Idempotency-Key: nothing is numbered, signed or stored. Signed in (X-Session) as the business's own Owner or Accountant.",
+        "operationId": "CheckConsoleTransportDocument",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsoleTransportRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportDocumentCheckResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
+    "/v1/console/transport-invoice-defaults": {
+      "get": {
+        "description": "DEV-2489: what the console's transport invoice form opens with: whether the deployment issues transport invoices, the issuer from the Business profile, the business's units as eFis last read the authority's register (the authority is not called), and the plates and routes used most recently. ?unit= keeps only the plates used with that business unit. Signed in (X-Session) on the business.",
+        "operationId": "ReadConsoleTransportInvoiceDefaults",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unit",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportInvoiceDefaultsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
     "/v1/console/transport-invoices": {
       "post": {
         "description": "DEV-2425: issues a transport invoice (registerTI) from the console form. Signed in (X-Session) as the business's own Owner or Accountant, with the password typed again (and a current code when two-factor is on). The console channel submits it through the same handler as POST /v1/transport-invoices, and its answer is returned unchanged, 503 transport_invoices_disabled included. It carries efis's own recorded software code. Idempotency-Key is passed through.",
@@ -19349,6 +20905,99 @@
               }
             },
             "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Console"
+        ]
+      }
+    },
+    "/v1/console/transport-invoices/check": {
+      "post": {
+        "description": "DEV-2489: the console form's transport invoice, checked as it is typed. Runs every check POST /v1/console/transport-invoices runs before a number is used, in the same order, with efis's own software code, and answers with every problem found, each with the form field it belongs to (path) or null. No password and no Idempotency-Key: nothing is numbered, signed or stored. Signed in (X-Session) as the business's own Owner or Accountant. With transport invoices switched off it answers ok false with the one problem transport_invoices_disabled.",
+        "operationId": "CheckConsoleTransportInvoice",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsoleTransportInvoiceRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportInvoiceCheckResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "422": {
             "content": {
@@ -19990,6 +21639,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -26589,7 +28248,7 @@
         ]
       },
       "post": {
-        "description": "Records a payment the buyer made against the invoice. Never sent to the authority, and the invoice is not changed. 422 not_receivable for a document with no payment due date, or a corrective or self-invoice; 422 payment_exceeds_outstanding for more than is still owed. A payment recorded in error is withdrawn, never deleted.",
+        "description": "Records a payment the buyer made against the invoice. Never sent to the authority, and the invoice is not changed. 422 not_receivable for a document with no payment due date, or a corrective or self-invoice; 422 payment_exceeds_outstanding for more than is still owed. A payment recorded in error is withdrawn, never deleted. The reference is the payment's key on this invoice: the same reference for the same amount, day and method answers 200 with the payment already recorded, so a retry is safe, and the same reference for a different payment is refused 409 payment_reference_reused. A withdrawn payment's reference can be used again.",
         "operationId": "RecordPaymentReceived",
         "parameters": [
           {
@@ -26669,6 +28328,16 @@
           }
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentReceivedView"
+                }
+              }
+            },
+            "description": "OK"
+          },
           "201": {
             "content": {
               "application/json": {
@@ -26708,6 +28377,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -28575,6 +30254,7 @@
     },
     "/v1/transport-documents": {
       "get": {
+        "description": "One page of this business's warehouse transfer notes, newest issue first, each with everything the note says. Filters, all optional: state and transaction (either a comma-separated list), issuedFrom / issuedTo and fiscalisedFrom / fiscalisedTo (an explicit offset, the from included and the to excluded), businessUnit, search (the note number, the issuer or authority code, or the vehicle's plates) and limit (up to 500; 200 without one). next is the cursor for the page behind this one: pass it as after. 400 invalid_state, invalid_transaction, invalid_period, invalid_limit or invalid_cursor when a filter cannot be read.",
         "operationId": "ListTransportDocuments",
         "parameters": [
           {
@@ -28597,6 +30277,76 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "transaction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "issuedFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "issuedTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalisedFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalisedTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "businessUnit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -28609,6 +30359,16 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "401": {
             "content": {
@@ -28780,8 +30540,146 @@
         ]
       }
     },
+    "/v1/transport-documents/export": {
+      "get": {
+        "description": "The warehouse transfer notes the list shows for the same filters, as CSV or Excel: format=csv or xlsx, language=sq (default) or en. Takes every filter GET /v1/transport-documents takes, except the page's own limit and cursor: the file holds every matching note, up to 1000, newest issue first. One row per note; what moves is on the note itself. 400 invalid_format, invalid_language, or the list's own refusals for a filter it cannot read.",
+        "operationId": "ExportTransportDocuments",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "language",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "transaction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "issuedFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "issuedTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalisedFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fiscalisedTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "businessUnit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "tags": [
+          "TransportDocuments"
+        ]
+      }
+    },
     "/v1/transport-documents/{id}": {
       "get": {
+        "description": "One warehouse transfer note: its number, codes and state, everything it says -- route, vehicle, carrier, goods, packaging -- and fiscalisedAt, when eFis recorded the authority's registration.",
         "operationId": "GetTransportDocument",
         "parameters": [
           {
@@ -28825,6 +30723,99 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "TransportDocuments"
+        ]
+      }
+    },
+    "/v1/transport-documents/{id}/pdf": {
+      "get": {
+        "description": "The warehouse transfer note as a PDF. paper=a4 (the default) is the whole note, as Law 87/2019 Art. 40(1) lists it; paper=slip is the 80 mm slip that travels with the goods, built around the QR. Served as soon as the note is numbered, because its QR is printed before the authority answers (Art. 39(3)), and it names the test verifier for a sandbox business. 400 invalid_paper for any other paper.",
+        "operationId": "PrintTransportDocument",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant-Id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Session",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Credential",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paper",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "401": {
             "content": {
