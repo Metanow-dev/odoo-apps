@@ -105,3 +105,10 @@ compose --profile odoo run --rm -T \
   -e EFIS_SOFTWARE_CODE="$(field softwareCode)" \
   odoo odoo shell -d ci < ci/restore_check.py | tee -a odoo-install.log
 grep -q '^ODOO-RESTORE-PASSED' odoo-install.log || { echo "The fiscal data did not come back from efis." >&2; exit 1; }
+
+# DEV-2348: the rest of an invoice's life with efis -- a refusal the person must act on, a credit
+# note as a correction of the invoice it reverses, and the payments efis tracks. It runs last,
+# after the restore above has read what one registered invoice comes back as, because a
+# correction supersedes the invoice it corrects.
+compose --profile odoo run --rm -T   -e EFIS_DEVICE_CODE="$(field deviceCode)"   odoo odoo shell -d ci < ci/invoice_check.py | tee -a odoo-install.log
+grep -q '^ODOO-INVOICE-PASSED' odoo-install.log || { echo "An invoice's corrections or payments did not go through efis." >&2; exit 1; }
