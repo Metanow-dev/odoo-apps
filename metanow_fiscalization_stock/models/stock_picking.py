@@ -9,6 +9,7 @@ from odoo.exceptions import UserError
 
 from odoo.addons.metanow_fiscalization.efis import client as efis_client
 from odoo.addons.metanow_fiscalization.efis import inbound as efis_inbound
+from odoo.addons.metanow_fiscalization.efis import outcome as efis_outcome
 
 from ..efis import transport
 from .stock_warehouse import PLACE_KINDS
@@ -85,7 +86,10 @@ class StockPicking(models.Model):
         help="Vetëm kur destinacioni nuk është magazinë e kompanisë. / Only when the destination is not one of the company's warehouses.")
     metanow_fiscal_carrier_id = fields.Many2one(
         "res.partner", string="Transportuesi / Carrier", copy=False,
-        help="Bosh kur transporton vetë kompania. / Empty when the company carries the goods itself.")
+        help="Bosh kur transporton vetë kompania. Transportuesi ka nevojë për emër dhe për numër "
+             "identifikimi, tatimor ose personal, te kontakti. "
+             "/ Empty when the company carries the goods itself. A carrier needs a name and an "
+             "identification number, tax or personal, on the contact.")
     metanow_fiscal_wtn_applies = fields.Boolean(compute="_compute_metanow_fiscal_wtn_applies")
     # Which document a press of the button issues: the one already issued, or the operation type's.
     metanow_fiscal_transport_document = fields.Selection(DOCUMENT_KINDS, compute="_compute_metanow_fiscal_wtn_applies")
@@ -131,8 +135,11 @@ class StockPicking(models.Model):
         else:
             destination = dict(self._metanow_fiscal_address(self.partner_id), kind=self.metanow_fiscal_destination_kind) \
                 if self.partner_id else {"kind": self.metanow_fiscal_destination_kind}
-        carrier = self.metanow_fiscal_carrier_id
-        if carrier and carrier.commercial_partner_id == company.partner_id.commercial_partner_id:
+        # Whoever carries the goods, when it is not the company itself: named as the business
+        # behind the contact, as the receiver is. The company carrying its own goods is no carrier
+        # at all -- the note's issuer is the carrier then (Law 87/2019 Art. 40(1)(h)).
+        carrier = self.metanow_fiscal_carrier_id.commercial_partner_id
+        if carrier == company.partner_id.commercial_partner_id:
             carrier = carrier.browse()
         goods = []
         value = 0
@@ -163,7 +170,15 @@ class StockPicking(models.Model):
             "to": destination,
             "issuer": {"name": company.name, "address": " ".join(p for p in (company.street, company.street2) if p) or None,
                        "town": company.city},
-            "carrier": {"name": carrier.name} if carrier else None,
+            # DEV-2444: efis takes the identifier type in its own words, the ones its country
+            # profile publishes; the partner's own field holds it, and empty means a tax number.
+            "carrier": {
+                "id_type": carrier.metanow_fiscal_identifier_type or None,
+                "id_number": carrier.vat or None,
+                "name": carrier.name,
+                "address": " ".join(p for p in (carrier.street, carrier.street2) if p) or None,
+                "town": carrier.city or None,
+            } if carrier else None,
             # DEV-2430: whom a transport invoice's goods go to (the transfer's partner).
             "receiver": {
                 "tax_id": efis_inbound.tax_id(receiver.vat) if receiver and receiver.vat else None,
@@ -188,7 +203,11 @@ class StockPicking(models.Model):
     def _metanow_fiscal_wtn_body(self, issued_at, kind):
         self.ensure_one()
         try:
-            body = transport.build(self._metanow_fiscal_wtn_note(issued_at), self._metanow_fiscal_wtn_config(), kind)
+            body = transport.build(
+                self._metanow_fiscal_wtn_note(issued_at),
+                self._metanow_fiscal_wtn_config(),
+                kind,
+                self.company_id._metanow_fiscal_profile())
         except transport.TransportInvalid as error:
             raise UserError(
                 f"{self.name}: efis nuk do ta pranonte këtë dokument transporti. / efis would not accept this transport document.\n"
@@ -305,19 +324,23 @@ class StockPicking(models.Model):
                 self._metanow_fiscal_trigger("metanow_fiscalization_stock.ir_cron_metanow_fiscal_wtn_poll")
             return
         code = body.get("code") or str(answer.status)
+        # DEV-2641: efis's own sentence, then its code and correlation id, as a refused invoice
+        # shows them (DEV-2223). The person has to know which field to correct before issuing again.
+        said = efis_outcome.error_text(answer)
         if code == "transport_invoices_disabled":
-            # The deployment has them switched off: no number was spent, and resending changes nothing.
+            # The deployment has them switched off: no number was spent, and resending changes
+            # nothing. Nothing about the document is wrong, so it is said in our own words.
             self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error":
                         "efis nuk lëshon ende fatura transporti. / efis does not issue transport invoices yet."})
         elif answer.status >= 500 or answer.status == 429:
-            self.write({"metanow_fiscal_wtn_error": f"efis: {code}"})  # efis's trouble: sent again
+            self.write({"metanow_fiscal_wtn_error": said})  # efis's trouble: sent again
         elif code in ("issued_at_not_today", "idempotency_key_reused"):
             # Not issued today, or the key names another note: a person issues it again, and the
             # check before that finds a note efis did number.
-            self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error": f"efis: {code}"})
+            self.write({"metanow_fiscal_wtn_state": "parked", "metanow_fiscal_wtn_error": said})
         else:
             # efis refused before numbering: no number was spent. Corrected and issued again.
-            self.write({"metanow_fiscal_wtn_state": "refused", "metanow_fiscal_wtn_error": f"efis: {code}"})
+            self.write({"metanow_fiscal_wtn_state": "refused", "metanow_fiscal_wtn_error": said})
 
     @api.model
     def _cron_metanow_fiscal_wtn_send(self):

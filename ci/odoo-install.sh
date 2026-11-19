@@ -9,16 +9,32 @@
 set -eu
 
 MOCK_ENDPOINT="http://mock-cis:8080/FiscalizationService-v3"
+MOCK_EINVOICE_ENDPOINT="http://mock-cis:8080/EinvoiceService-v1"
 export EFIS_GATEWAY_ENDPOINT="$MOCK_ENDPOINT"
 export EFIS_GATEWAY_SIGNER=mock
+# DEV-2348: the e-invoice service is a different service of the authority, and without its
+# address efis builds no e-invoice at all, so the module's e-invoice path could not be checked.
+# The mock's, and sending switched on, so the authority's EIC comes back the way a customer's
+# does. Both are the mock and nothing else: the case below refuses any other address.
+export EFIS_EINVOICE_ENDPOINT="$MOCK_EINVOICE_ENDPOINT"
+export EFIS_EINVOICE_SEND=true
+# efis asks the authority for a business's purchase e-invoices every 15 minutes by default, which
+# no job waits for: every minute here, so one arrives while the check is still running.
+export EFIS_EINVOICE_SYNC_MINUTES=1
 export EFIS_AUTHORITY_ENVIRONMENT=Test
-export EFIS_PULL_POLICY=always
+# always in CI, where the image comes from the registry; a local run (DEV-2348) against a
+# locally built efis:local sets this to missing.
+export EFIS_PULL_POLICY="${EFIS_PULL_POLICY:-always}"
 export ASPNETCORE_ENVIRONMENT=Production
 
 # Never anywhere but the mock: this job has no business reaching the authority, test or production.
 case "$EFIS_GATEWAY_ENDPOINT" in
   "$MOCK_ENDPOINT") ;;
   *) echo "odoo-install sends to the mock authority only." >&2; exit 1 ;;
+esac
+case "$EFIS_EINVOICE_ENDPOINT" in
+  "$MOCK_EINVOICE_ENDPOINT") ;;
+  *) echo "odoo-install sends e-invoices to the mock authority only." >&2; exit 1 ;;
 esac
 
 test -n "${EFIS_IMAGE:-}" || { echo "EFIS_IMAGE is required." >&2; exit 1; }
@@ -80,6 +96,22 @@ grep -q '^ODOO-INSTALL-PASSED' odoo-install.log || { echo "The invoice was not f
 compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/webhook_check.py | tee -a odoo-install.log
 grep -q '^ODOO-WEBHOOK-PASSED' odoo-install.log || { echo "The module did not register for efis's events." >&2; exit 1; }
 
+# DEV-2348: a stock transfer through efis as a customer would do it: a transfer note issued,
+# numbered, registered and printed, then the same transfer as a transport invoice, which this
+# deployment does not issue. It runs before the uninstall below, which takes the add-ons with it.
+compose --profile odoo run --rm -T \
+  -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)" \
+  odoo odoo shell -d ci < ci/transport_check.py | tee -a odoo-install.log
+grep -q '^ODOO-TRANSPORT-PASSED' odoo-install.log || { echo "The transfer note did not go through efis." >&2; exit 1; }
+
+# DEV-2348: a till's cash through efis -- the day's opening float, cash in and out, one float a
+# day per device, and a declared movement that is never deleted. Before the uninstall too, which
+# takes the Point of Sale add-on with it.
+compose --profile odoo run --rm -T \
+  -e EFIS_DEVICE_CODE="$(field deviceCode)" \
+  odoo odoo shell -d ci < ci/pos_check.py | tee -a odoo-install.log
+grep -q '^ODOO-POS-PASSED' odoo-install.log || { echo "The till's cash did not go through efis." >&2; exit 1; }
+
 # DEV-2443: uninstall through Odoo's dialog, install again, pair again, and restore from efis.
 FISCALISED="$(sed -n 's/^ODOO-INSTALL-PASSED //p' odoo-install.log | tail -n 1)"
 compose --profile odoo run --rm -T odoo odoo shell -d ci < ci/uninstall.py | tee -a odoo-install.log
@@ -95,3 +127,17 @@ compose --profile odoo run --rm -T \
   -e EFIS_SOFTWARE_CODE="$(field softwareCode)" \
   odoo odoo shell -d ci < ci/restore_check.py | tee -a odoo-install.log
 grep -q '^ODOO-RESTORE-PASSED' odoo-install.log || { echo "The fiscal data did not come back from efis." >&2; exit 1; }
+
+# DEV-2348: the rest of an invoice's life with efis -- a refusal the person must act on, a credit
+# note as a correction of the invoice it reverses, and the payments efis tracks. It runs last,
+# after the restore above has read what one registered invoice comes back as, because a
+# correction supersedes the invoice it corrects.
+compose --profile odoo run --rm -T   -e EFIS_DEVICE_CODE="$(field deviceCode)"   odoo odoo shell -d ci < ci/invoice_check.py | tee -a odoo-install.log
+grep -q '^ODOO-INVOICE-PASSED' odoo-install.log || { echo "An invoice's corrections or payments did not go through efis." >&2; exit 1; }
+
+# DEV-2348: a purchase e-invoice arriving as a draft vendor bill the business answers (DEV-2433).
+# A second Odoo company, paired to the second business the driver provisioned, issues it, so the
+# e-invoice reaches the buyer the way a real one does. It runs after the stage above, which left
+# the buying company sending e-invoices.
+compose --profile odoo run --rm -T   -e EFIS_BASE_URL=http://api:8080   -e EFIS_SUPPLIER_PAIRING_CODE="$(field supplierCode)"   -e EFIS_SUPPLIER_TAX_ID="$(field supplierTaxId)"   -e EFIS_BUSINESS_UNIT_CODE="$(field businessUnitCode)"   -e EFIS_OPERATOR_CODE="$(field operatorCode)"   -e EFIS_SOFTWARE_CODE="$(field softwareCode)"   odoo odoo shell -d ci < ci/inbound_check.py | tee -a odoo-install.log
+grep -q '^ODOO-INBOUND-PASSED' odoo-install.log || { echo "A purchase e-invoice did not arrive as a vendor bill." >&2; exit 1; }

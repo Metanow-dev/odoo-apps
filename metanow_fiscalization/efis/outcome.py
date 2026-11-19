@@ -122,8 +122,12 @@ def document_values(current, document):
     return values
 
 
-def _error_text(response):
-    """efis's PlatformError for a person: its sentence in full first, then the code for support."""
+def error_text(response):
+    """efis's PlatformError for a person: its sentence in full first, then the code for support.
+
+    DEV-2641: the add-ons render a refusal with this too, so a refused transport document says
+    what a refused invoice says (DEV-2223).
+    """
     body = response.body if isinstance(response.body, dict) else {}
     code = body.get("code") or f"http_{response.status}"
     detail = str(body.get("detail") or "").strip()
@@ -161,21 +165,21 @@ def submission_values(current, response):
     body = response.body if isinstance(response.body, dict) else {}
     retryable = body.get("retryable")
     if status in (401, 403):
-        return {STATE: PARKED, ERROR: _error_text(response)}
+        return {STATE: PARKED, ERROR: error_text(response)}
     if status in _RETRY_STATUSES or (status >= 500 and retryable is not False):
-        return {ERROR: _error_text(response)}
+        return {ERROR: error_text(response)}
     if 400 <= status < 500 and retryable is True:
-        return {ERROR: _error_text(response)}
+        return {ERROR: error_text(response)}
     if status >= 500:
-        return {STATE: PARKED, ERROR: _error_text(response)}
-    return {STATE: REFUSED, ERROR: _error_text(response)}
+        return {STATE: PARKED, ERROR: error_text(response)}
+    return {STATE: REFUSED, ERROR: error_text(response)}
 
 
 def poll_values(current, response):
     """Values for one write after GET /v1/documents/{id}, or None when nothing changed."""
     if response is None or not (200 <= response.status < 300):
         if response is not None and response.status in (401, 403):
-            return {STATE: PARKED, ERROR: _error_text(response)}
+            return {STATE: PARKED, ERROR: error_text(response)}
         return None
     values = document_values(current, response.body)
     changed = {key: value for key, value in values.items() if current.get(key) != value}
