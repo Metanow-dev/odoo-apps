@@ -82,6 +82,13 @@ services:
       # lost or changed, everyone who turned two-factor on cannot sign in until an admin turns
       # it off for them -- and an admin who turned it on is locked out the same way.
       Efis__Accounts__TwoFactorKey: "${EFIS_TWO_FACTOR_KEY:-}"
+      # Whether two-factor is required of the roles that reach a certificate -- a business Owner
+      # and a platform admin (BUILD_SPEC section 8). Empty or false means it is offered and
+      # recommended, not required (decided 5 Nov 2026: offered first, required later). true
+      # refuses a certificate upload by an Owner without it (403 mfa_required), and refuses a
+      # platform admin without it every platform route; both keep their sign-in and My account,
+      # where they turn it on. Needs Efis__Accounts__TwoFactorKey set, or nobody can comply.
+      Efis__Accounts__TwoFactorRequired: "${EFIS_TWO_FACTOR_REQUIRED:-}"
       # Document submissions per taxpayer per minute, per api replica. Empty means 600; 0 turns
       # the limit off.
       Efis__RateLimits__DocumentWritesPerMinute: "${EFIS_RATE_LIMIT_PER_MINUTE:-}"
@@ -100,6 +107,25 @@ services:
       # Authority, O=NAIS, C=AL; seen 11 Nov 2026). NAIS is AKSHI's English name; the match is
       # on text, so "AKSHI" refused every answer. Production's issuer is confirmed before go-live.
       EFIS_AUTHORITY_SIGNER_ISSUER: "${EFIS_AUTHORITY_SIGNER_ISSUER:-NAIS}"
+      # DEV-2451: the api reads the worker's e-invoice address as a flag, never as an address --
+      # it is how it knows whether an e-invoice would ever be built. Empty means an invoice marked
+      # electronic is refused before it is numbered (einvoice_not_enabled) instead of being
+      # numbered with an e-invoice that never exists, and /v1/status says e-invoicing is off.
+      EFIS_EINVOICE_ENDPOINT: "${EFIS_EINVOICE_ENDPOINT:-}"
+      # DEV-2035, DEV-2555: what step 90 locked in custody (design 06) -- the stored printout
+      # GET /v1/documents/{id}/pdf serves, and each document's locked objects in the archive
+      # exports. The api only reads them (Documents/CustodyReader.cs). Empty means custody is
+      # off, as if nobody had chosen, and a stored printout is not served; a store named with
+      # one of its values missing refuses to start, as in the worker. The api and the worker
+      # read the same names, so one deployment passes one credential to both and it must be
+      # allowed to read the bucket (DEV-2622 splits them). Runbook section 10.
+      EFIS_CUSTODY_STORE: "${EFIS_CUSTODY_STORE:-}"
+      EFIS_CUSTODY_DIRECTORY: "${EFIS_CUSTODY_DIRECTORY:-}"
+      EFIS_CUSTODY_S3_ENDPOINT: "${EFIS_CUSTODY_S3_ENDPOINT:-}"
+      EFIS_CUSTODY_S3_BUCKET: "${EFIS_CUSTODY_S3_BUCKET:-}"
+      EFIS_CUSTODY_S3_REGION: "${EFIS_CUSTODY_S3_REGION:-}"
+      EFIS_CUSTODY_S3_ACCESS_KEY_ID: "${EFIS_CUSTODY_S3_ACCESS_KEY_ID:-}"
+      EFIS_CUSTODY_S3_SECRET_ACCESS_KEY: "${EFIS_CUSTODY_S3_SECRET_ACCESS_KEY:-}"
       # The signer's socket. The api holds no key; it asks the signer, over a socket only
       # the containers that mount this volume can reach.
       Signer__Socket: /run/efis-signer/signer.sock
@@ -163,17 +189,50 @@ services:
       # The contract a request is validated against before it is sent: the host's (DEV-1815).
       Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
       Signer__Socket: /run/efis-signer/signer.sock
+      # The e-invoice service (builder-log §59), which is a different service of the authority from
+      # the fiscalisation one. Empty means no UBL is built and nothing is sent -- and then the api
+      # refuses an invoice marked electronic, rather than numbering one whose e-invoice never
+      # exists (DEV-2451). On a test-only deployment it may be the mock
+      # (http://mock-cis:8080/EinvoiceService-v1, with EFIS_GATEWAY_SIGNER=mock).
+      EFIS_EINVOICE_ENDPOINT: "${EFIS_EINVOICE_ENDPOINT:-}"
+      # Whether stored e-invoices are sent. A second switch, off by default: where the Albanian
+      # CIUS puts the fiscal codes inside the UBL is not published, and until it is confirmed on
+      # the authority's test host a built e-invoice is kept, not sent (builder-log §59, decision 3).
+      # Building, listing, decisions and lookups run without it.
+      EFIS_EINVOICE_SEND: "${EFIS_EINVOICE_SEND:-}"
+      # How often the tenant's e-invoices as buyer and as seller are listed again. Empty means 15.
+      EFIS_EINVOICE_SYNC_MINUTES: "${EFIS_EINVOICE_SYNC_MINUTES:-}"
+      # DEV-2195: how many days before its book review on the 11th a received e-invoice still
+      # unanswered gets its one einvoice.answer_due. Empty means 3.
+      EFIS_EINVOICE_ANSWER_DUE_DAYS: "${EFIS_EINVOICE_ANSWER_DUE_DAYS:-}"
+      # DEV-2196: the authority's book, for the period check the console offers. It reads and
+      # registers nothing. Empty means a book check waits and says why it was not made.
+      EFIS_DATA_ENDPOINT: "${EFIS_DATA_ENDPOINT:-}"
       # DEV-1733: a second copy of every attempt's signed request and response bytes in object
       # storage, by SHA-256, copied after the fact on its own loop. Empty means off, and Postgres
       # is the only copy. "s3" needs the five EFIS_ARCHIVE_S3_* values; the worker refuses to start
       # with a store named and a value missing. A failed copy is retried and never touches a
       # submission. Runbook section 10.
       EFIS_ARCHIVE_STORE: "${EFIS_ARCHIVE_STORE:-}"
+      EFIS_ARCHIVE_DIRECTORY: "${EFIS_ARCHIVE_DIRECTORY:-}"
       EFIS_ARCHIVE_S3_ENDPOINT: "${EFIS_ARCHIVE_S3_ENDPOINT:-}"
       EFIS_ARCHIVE_S3_BUCKET: "${EFIS_ARCHIVE_S3_BUCKET:-}"
       EFIS_ARCHIVE_S3_REGION: "${EFIS_ARCHIVE_S3_REGION:-}"
       EFIS_ARCHIVE_S3_ACCESS_KEY_ID: "${EFIS_ARCHIVE_S3_ACCESS_KEY_ID:-}"
       EFIS_ARCHIVE_S3_SECRET_ACCESS_KEY: "${EFIS_ARCHIVE_S3_SECRET_ACCESS_KEY:-}"
+      # DEV-2035, DEV-2555: step 90's custody copy of each accepted document, locked in
+      # compliance mode until RetentionPolicy.KeptUntil. Its own store, never the copy-out's:
+      # which provider and country hold it is a decision of its own (design 06). Empty means
+      # step 90 is off; a store named with one of its values missing refuses to start. The api
+      # reads the same names to serve the stored printout. "filesystem" wants a path both
+      # containers see, and compose mounts none, so a compose deployment names "s3".
+      EFIS_CUSTODY_STORE: "${EFIS_CUSTODY_STORE:-}"
+      EFIS_CUSTODY_DIRECTORY: "${EFIS_CUSTODY_DIRECTORY:-}"
+      EFIS_CUSTODY_S3_ENDPOINT: "${EFIS_CUSTODY_S3_ENDPOINT:-}"
+      EFIS_CUSTODY_S3_BUCKET: "${EFIS_CUSTODY_S3_BUCKET:-}"
+      EFIS_CUSTODY_S3_REGION: "${EFIS_CUSTODY_S3_REGION:-}"
+      EFIS_CUSTODY_S3_ACCESS_KEY_ID: "${EFIS_CUSTODY_S3_ACCESS_KEY_ID:-}"
+      EFIS_CUSTODY_S3_SECRET_ACCESS_KEY: "${EFIS_CUSTODY_S3_SECRET_ACCESS_KEY:-}"
     volumes:
       - signer-socket:/run/efis-signer
     # The worker has no port. It touches this file every 15 seconds, and only after its
@@ -211,6 +270,11 @@ services:
       ConnectionStrings__Postgres: "Host=postgres;Database=efis;Username=efis;Password=${EFIS_POSTGRES_PASSWORD:?EFIS_POSTGRES_PASSWORD is required}"
       Signer__Socket: /run/efis-signer/signer.sock
       Signer__SealingKeyFile: "${EFIS_SIGNER_SEALING_KEY_FILE:-}"
+      # DEV-2196: how many read-back signatures an hour the signer will make for one business, for
+      # the console's book check. No default, deliberately: until a deployment chooses a number the
+      # signer refuses every read-back rather than guess, and the check says it was not made. It
+      # goes with the worker's EFIS_DATA_ENDPOINT -- one without the other checks nothing.
+      EFIS_READBACK_SIGNATURES_PER_HOUR: "${EFIS_READBACK_SIGNATURES_PER_HOUR:-}"
       Efis__AuthorityEnvironment: "${EFIS_AUTHORITY_ENVIRONMENT:?EFIS_AUTHORITY_ENVIRONMENT is required: Test or Production}"
       EFIS_HEARTBEAT_FILE: /tmp/efis-heartbeat
     volumes:

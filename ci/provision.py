@@ -59,12 +59,15 @@ def session(email, password):
     return answer["session"] if "session" in answer else answer["token"]
 
 
-def main():
-    slug = "odoo-ci-" + uuid.uuid4().hex[:6]
+def provision(admin, label, codes=1):
+    """One business, as its owner sets it up: registry codes, a test certificate, pairing codes.
+
+    Returns its tax id and as many single-use pairing codes as asked for, for the channel "odoo".
+    """
+    slug = f"odoo-ci-{label}-" + uuid.uuid4().hex[:6]
     tax_id = "K" + str(uuid.uuid4().int)[:8] + "S"
     owner = (f"owner-{slug}@example.invalid", "owner-password-" + uuid.uuid4().hex)
 
-    admin = session(os.environ["EFIS_ADMIN_EMAIL"], os.environ["EFIS_ADMIN_PASSWORD"])
     tenant = call("POST", "/v1/tenants",
                   {"slug": slug, "taxId": tax_id, "country": "AL", "numberingModel": "per_business_unit"},
                   {"X-Provisioning-Key": os.environ["EFIS_PROVISIONING_KEY"]}, expect=(201,))
@@ -89,18 +92,28 @@ def main():
          {"pkcs12": base64.b64encode(bundle).decode(), "passphrase": phrase.decode(), "currentPassword": owner[1]},
          headers)
 
-    pairing = call("POST", "/v1/pairing-codes", {"channel": "odoo"}, headers)
-    # DEV-2443: a second single-use code, for pairing again after the module is reinstalled.
-    again = call("POST", "/v1/pairing-codes", {"channel": "odoo"}, headers)
+    pairing = [call("POST", "/v1/pairing-codes", {"channel": "odoo"}, headers)["code"] for _ in range(codes)]
+    return tax_id, pairing
+
+
+def main():
+    admin = session(os.environ["EFIS_ADMIN_EMAIL"], os.environ["EFIS_ADMIN_PASSWORD"])
+    # DEV-2443: a second code for the business, to pair again after the module is reinstalled.
+    tax_id, (code, reinstall) = provision(admin, "shop", codes=2)
+    # DEV-2348: a second business, the supplier, so a purchase e-invoice can reach the first one
+    # the way a real one does -- issued by someone else, to this business's tax number.
+    supplier_tax_id, (supplier_code,) = provision(admin, "sup")
     print(json.dumps({
-        "code": pairing["code"],
-        "reinstallCode": again["code"],
+        "code": code,
+        "reinstallCode": reinstall,
         "taxId": tax_id,
         "businessUnitCode": CODES["business-unit"],
         "operatorCode": CODES["operator"],
         "softwareCode": CODES["software"],
         # DEV-2348: a cash invoice is issued on a device, so the check needs its code too.
         "deviceCode": CODES["device"],
+        "supplierCode": supplier_code,
+        "supplierTaxId": supplier_tax_id,
     }))
 
 

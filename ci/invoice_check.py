@@ -2,6 +2,8 @@
 # one registered invoice. Walks the rest of an invoice's life with efis as a customer would:
 #
 # * a refusal the person has to act on, in words rather than a code (DEV-2223),
+# * a cash invoice, from its device to the authority's registration (DEV-2448),
+# * an invoice to a registered business sent as an e-invoice, with its EIC (DEV-2358, DEV-2451),
 # * a credit note sent as a correction of the invoice it reverses (DEV-2431),
 # * the payments efis tracks for the invoice, recorded and withdrawn again (DEV-2432).
 #
@@ -138,19 +140,49 @@ assert not over.metanow_fiscal_security_code, "a refused invoice was sealed"
 assert len(said.split()) > 3, f"the refusal says too little: {said!r}"
 assert "100000" in said, f"the refusal does not name the cash ceiling: {said!r}"
 
-# A cash invoice under the ceiling is numbered, and the pinned efis then holds it rather than
-# sending it: every cash invoice sent through the api was held for timing until DEV-2448, which
-# is fixed on efis but not in the version this module is pinned to. So this stops at the number,
-# and the rest of a cash invoice's life moves with contract/ (DEV-2642).
-under = invoice(1200.0, journal=cash)
-under.action_post()
-env.cr.commit()  # noqa: F821
-under.invalidate_recordset()
-under._metanow_fiscal_send()
-env.cr.commit()  # noqa: F821
-assert under.metanow_fiscal_number, under.metanow_fiscal_error
+# A cash invoice under the ceiling goes all the way: numbered on its device, sent inside efis's
+# own stamp window, and registered (DEV-2448, which held every cash invoice before it was fixed).
+under = registered(invoice(1200.0, journal=cash), "the cash invoice")
 assert under.metanow_fiscal_verification_url and "cr=" in under.metanow_fiscal_verification_url, (
     "a cash invoice's verification URL names the device it was issued on")
+# A cash invoice is never an e-invoice: efis refuses one paid in cash.
+assert not under.metanow_fiscal_electronic, "a cash invoice went out as an e-invoice"
+
+# ------------------------------------------------------------------ an invoice as an e-invoice
+
+# DEV-2358: a non-cash invoice to a buyer named by a domestic tax number goes to that buyer as an
+# e-invoice, while the company wants them and efis can build them (DEV-2451).
+company.metanow_fiscal_einvoice = True
+company._metanow_fiscal_refresh_einvoice_platform()
+assert company.metanow_fiscal_einvoice_platform == "on", (
+    "this efis builds no e-invoices; EFIS_EINVOICE_ENDPOINT is unset in the compose file")
+assert company._metanow_fiscal_einvoice_on()
+env.cr.commit()  # noqa: F821
+
+electronic = registered(
+    invoice(3000.0, due=date.today() + timedelta(days=15)), "the e-invoice")
+assert electronic.metanow_fiscal_electronic, "the invoice did not go as an e-invoice"
+deadline = time.time() + 180
+while time.time() < deadline and not electronic.metanow_fiscal_einvoice_eic:
+    electronic._metanow_fiscal_poll()
+    env.cr.commit()  # noqa: F821
+    electronic.invalidate_recordset()
+    if electronic.metanow_fiscal_einvoice_error:
+        break
+    time.sleep(3)
+assert not electronic.metanow_fiscal_einvoice_error, electronic.metanow_fiscal_einvoice_error
+assert electronic.metanow_fiscal_einvoice_eic, (
+    "the authority's e-invoice code never came back", electronic.metanow_fiscal_einvoice_state)
+assert electronic.metanow_fiscal_einvoice_state, "the e-invoice has no state"
+# The fiscal invoice's own codes are untouched by the e-invoice's.
+assert electronic.metanow_fiscal_einvoice_eic != electronic.metanow_fiscal_registration_code
+
+# A buyer efis cannot name by a domestic tax number gets a plain fiscal invoice instead.
+person = env["res.partner"].create({  # noqa: F821
+    "name": "Blerës privat", "street": "Rruga 9", "city": "Tiranë", "country_id": env.ref("base.al").id})  # noqa: F821
+plain = registered(invoice(400.0, partner=person), "the invoice to a person")
+assert not plain.metanow_fiscal_electronic, "an invoice to a buyer with no tax number went as an e-invoice"
+assert not plain.metanow_fiscal_einvoice_eic
 
 # ------------------------------------------------------------------ a credit note as a correction
 

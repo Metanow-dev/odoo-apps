@@ -1,14 +1,12 @@
 # DEV-2348: run inside `odoo shell` after metanow_fiscalization_stock is installed and the
 # company is paired (ci/post_invoice.py ran first). Walks a stock transfer through efis as a
-# customer would: a warehouse transfer note for goods leaving a warehouse (DEV-2429), followed
-# until the authority registers it, printed on the delivery slip, and frozen afterwards. Then the
-# same transfer as a transport invoice (DEV-2430), which this deployment keeps switched off.
-#
-# The company carries its own goods here. A transfer that names a carrier (DEV-2444) needs an
-# efis that publishes carrier.idType in its country profile, which the pinned one does not, so
-# that case moves with contract/ (DEV-2348 finding, 19 Nov 2026).
+# customer would: a warehouse transfer note for goods leaving a warehouse (DEV-2429), carried by
+# someone other than the company (DEV-2444), followed until the authority registers it, printed
+# on the delivery slip, and frozen afterwards. Then the same transfer as a transport invoice
+# (DEV-2430), which this deployment keeps switched off.
 #
 # Prints ODOO-TRANSPORT-PASSED on success; odoo-install.sh fails the job without that line.
+import json
 import os
 import time
 
@@ -67,6 +65,16 @@ customer = env["res.partner"].create({  # noqa: F821
     "name": "Dyqani i Durrësit", "street": "Lagjja 1", "city": "Durrës",
     "vat": "L91234567K", "country_id": env.ref("base.al").id,  # noqa: F821
 })
+# DEV-2444: a carrier other than the company, named by its own tax number. efis takes the
+# identifier type in its own words, out of the ones its country profile publishes under
+# carrier.idType; a partner with none set means efis's default, a domestic tax number.
+carrier = env["res.partner"].create({  # noqa: F821
+    "name": "Transportues sh.p.k.", "street": "Rruga 1", "city": "Durrës",
+    "vat": "k3 1418021 l", "country_id": env.ref("base.al").id,  # noqa: F821
+})
+profile = company._metanow_fiscal_profile()
+assert profile is not None and profile.codes("carrier.idType"), (
+    "efis publishes no carrier identifier types; the contract copy is behind efis (DEV-2642)")
 product = env["product.product"].create({  # noqa: F821
     "name": "Tavolinë", "default_code": "T-1", "is_storable": True, "standard_price": 71.0,
 })
@@ -87,7 +95,8 @@ def transfer(picking_type, partner, destination_kind):
     })
     picking.write({
         "metanow_fiscal_vehicle_plates": "AA-123-BB",
-        "metanow_fiscal_vehicle_ownership": "OWNER",
+        "metanow_fiscal_vehicle_ownership": "THIRDPARTY",
+        "metanow_fiscal_carrier_id": carrier.id,
         "metanow_fiscal_destination_kind": destination_kind,
     })
     return picking
@@ -114,9 +123,12 @@ assert picking.metanow_fiscal_wtn_state == "to_send", picking.metanow_fiscal_wtn
 assert picking.metanow_fiscal_transport_kind == "wtn", picking.metanow_fiscal_transport_kind
 # The goods are valued at cost, the working guess of DEV-2441: two tables at 71.00.
 assert '"valueOfGoods": "142.00"' in picking.metanow_fiscal_wtn_request, picking.metanow_fiscal_wtn_request
-# The company carrying its own goods is no carrier at all: the note's issuer is the carrier
-# (Law 87/2019 Art. 40(1)(h)).
-assert '"carrier": null' in picking.metanow_fiscal_wtn_request, picking.metanow_fiscal_wtn_request
+# The carrier is named in efis's own words, and its number as efis compares one: no spaces,
+# upper case, no country prefix (DEV-2444).
+sent = json.loads(picking.metanow_fiscal_wtn_request)
+assert sent["carrier"]["idType"] == "tax", sent["carrier"]
+assert sent["carrier"]["idNumber"] == "K31418021L", sent["carrier"]
+assert sent["carrier"]["name"] == "Transportues sh.p.k.", sent["carrier"]
 
 picking._metanow_fiscal_wtn_send()
 env.cr.commit()  # noqa: F821
@@ -144,7 +156,8 @@ for vals, what in (
     ({"metanow_fiscal_wtn_number": "9/2026"}, "the number"),
     ({"metanow_fiscal_wtn_security_code": "0" * 32}, "the security code"),
     ({"metanow_fiscal_vehicle_plates": "BB-456-CC"}, "the vehicle plates"),
-    ({"metanow_fiscal_vehicle_ownership": "THIRDPARTY"}, "whom the vehicle belongs to"),
+    ({"metanow_fiscal_vehicle_ownership": "OWNER"}, "whom the vehicle belongs to"),
+    ({"metanow_fiscal_carrier_id": False}, "the carrier"),
 ):
     with refused(f"{what} changed after the note was issued"):
         picking.write(vals)
